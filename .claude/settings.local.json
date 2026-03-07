@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(C:\\\\xampp\\\\php\\\\php.exe --version)",
+      "Bash(/c/xampp/php/php.exe --version)",
+      "Bash(php generate_students.php)"
+    ]
+  }
+}
