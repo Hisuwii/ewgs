@@ -567,30 +567,28 @@ class AdminModel {
         return $result->fetch_all(MYSQLI_ASSOC);
     }
 
-    // Enroll a student in a class — returns 'already_enrolled', 'duplicate', true, or false
+    // Link a student to a class — returns 'duplicate', true, or false
     public static function enrollStudentInClass($studentId, $classId) {
         $conn = getConnection();
 
-        // Check current class assignment
-        $check = $conn->prepare("SELECT class_id FROM tbl_student WHERE student_id = ?");
-        $check->bind_param("i", $studentId);
+        // Check if already linked to this class
+        $check = $conn->prepare("SELECT student_class_id FROM tbl_student_class WHERE student_id = ? AND class_id = ?");
+        $check->bind_param("ii", $studentId, $classId);
         $check->execute();
         $row = $check->get_result()->fetch_row();
         $check->close();
-        if ($row && $row[0] !== null) {
-            return $row[0] == $classId ? 'duplicate' : 'already_enrolled';
-        }
+        if ($row) return 'duplicate';
 
-        $stmt = $conn->prepare("UPDATE tbl_student SET class_id = ? WHERE student_id = ?");
-        $stmt->bind_param("ii", $classId, $studentId);
+        $stmt = $conn->prepare("INSERT INTO tbl_student_class (student_id, class_id) VALUES (?, ?)");
+        $stmt->bind_param("ii", $studentId, $classId);
         $stmt->execute();
         return $stmt->affected_rows > 0;
     }
 
-    // Remove a student from a class (clear assignment)
+    // Remove a student from a class
     public static function removeStudentFromClass($studentId, $classId) {
         $conn = getConnection();
-        $stmt = $conn->prepare("UPDATE tbl_student SET class_id = NULL WHERE student_id = ? AND class_id = ?");
+        $stmt = $conn->prepare("DELETE FROM tbl_student_class WHERE student_id = ? AND class_id = ?");
         $stmt->bind_param("ii", $studentId, $classId);
         $stmt->execute();
         return $stmt->affected_rows > 0;
@@ -600,17 +598,18 @@ class AdminModel {
     public static function getStudentClassLinks($classId = null, $adminId = null) {
         $conn   = getConnection();
         $sql    = "
-            SELECT s.student_id, s.class_id,
+            SELECT s.student_id, sc2.class_id,
                    CONCAT(s.student_lname, ', ', s.student_fname) AS student_name,
                    s.student_lrn AS lrn, s.student_gender AS gender,
                    c.class_name, c.grade_level, c.school_year
             FROM tbl_student s
-            INNER JOIN tbl_class c ON s.class_id = c.class_id
+            INNER JOIN tbl_student_class sc2 ON sc2.student_id = s.student_id
+            INNER JOIN tbl_class c           ON c.class_id = sc2.class_id
             WHERE 1=1";
         $types  = "";
         $params = [];
-        if ($classId)          { $sql .= " AND s.class_id = ?";  $types .= "i"; $params[] = $classId; }
-        if ($adminId !== null) { $sql .= " AND c.admin_id = ?";  $types .= "i"; $params[] = $adminId; }
+        if ($classId)          { $sql .= " AND sc2.class_id = ?"; $types .= "i"; $params[] = $classId; }
+        if ($adminId !== null) { $sql .= " AND c.admin_id = ?";   $types .= "i"; $params[] = $adminId; }
         $sql .= $classId
             ? " ORDER BY s.student_lname ASC, s.student_fname ASC"
             : " ORDER BY c.grade_level ASC, c.class_name ASC, s.student_lname ASC";
@@ -623,7 +622,7 @@ class AdminModel {
         return $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
     }
 
-    // Get students not yet assigned to any class, scoped to admin
+    // Get students not yet linked to a specific class, scoped to admin
     public static function getUnenrolledStudents($classId, $adminId = null) {
         $conn   = getConnection();
         $sql    = "
@@ -631,18 +630,17 @@ class AdminModel {
                    CONCAT(s.student_lname, ', ', s.student_fname) AS student_name,
                    s.student_lrn AS lrn, s.student_gender AS gender
             FROM tbl_student s
-            WHERE s.class_id IS NULL";
-        $types  = "";
-        $params = [];
+            WHERE s.student_id NOT IN (
+                SELECT student_id FROM tbl_student_class WHERE class_id = ?
+            )";
+        $types  = "i";
+        $params = [$classId];
         if ($adminId !== null) { $sql .= " AND s.admin_id = ?"; $types .= "i"; $params[] = $adminId; }
         $sql .= " ORDER BY s.student_lname ASC, s.student_fname ASC";
-        if ($types) {
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param($types, ...$params);
-            $stmt->execute();
-            return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        }
-        return $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     }
 
     // ============================================================
@@ -657,7 +655,8 @@ class AdminModel {
                    COUNT(s.student_id) AS student_count
             FROM tbl_class c
             INNER JOIN tbl_teacher_class tc ON c.class_id = tc.class_id
-            LEFT JOIN tbl_student s ON s.class_id = c.class_id
+            LEFT JOIN tbl_student_class sc2 ON sc2.class_id = c.class_id
+            LEFT JOIN tbl_student s ON s.student_id = sc2.student_id
             WHERE tc.teacher_id = ?
             GROUP BY c.class_id
             ORDER BY c.grade_level ASC, c.class_name ASC
@@ -692,7 +691,8 @@ class AdminModel {
             SELECT s.student_id, s.student_fname, s.student_lname,
                    s.student_lrn AS lrn, s.student_gender AS gender
             FROM tbl_student s
-            WHERE s.class_id = ?
+            INNER JOIN tbl_student_class sc2 ON sc2.student_id = s.student_id
+            WHERE sc2.class_id = ?
             ORDER BY s.student_lname ASC, s.student_fname ASC
         ");
         $stmt->bind_param("i", $classId);
@@ -765,7 +765,7 @@ class AdminModel {
         $conn = getConnection();
         $stmt = $conn->prepare("
             SELECT c.class_id,
-                   (SELECT COUNT(*) FROM tbl_student WHERE class_id = c.class_id) AS student_count,
+                   (SELECT COUNT(*) FROM tbl_student_class WHERE class_id = c.class_id) AS student_count,
                    (SELECT COUNT(*) FROM tbl_subject_class  WHERE class_id = c.class_id) AS subject_count,
                    (SELECT COUNT(*) FROM tbl_grade g
                     INNER JOIN tbl_subject_class scc ON g.subject_class_id = scc.subject_class_id
@@ -816,7 +816,8 @@ class AdminModel {
             INNER JOIN tbl_activity a           ON ss.activity_id  = a.activity_id
             INNER JOIN tbl_grading_component gc ON a.component_id  = gc.component_id
             INNER JOIN tbl_student s            ON ss.student_id   = s.student_id
-            WHERE gc.subject_id = ? AND ss.quarter = ? AND s.class_id = ?
+            INNER JOIN tbl_student_class sc2    ON sc2.student_id  = s.student_id
+            WHERE gc.subject_id = ? AND ss.quarter = ? AND sc2.class_id = ?
         ");
         $stmt->bind_param("isi", $subjectId, $quarter, $classId);
         $stmt->execute();
@@ -1029,7 +1030,7 @@ class AdminModel {
             WHERE sc.class_id = ?
             GROUP BY g.quarter
             HAVING COUNT(*) = (
-                (SELECT COUNT(*) FROM tbl_student      WHERE class_id = ?) *
+                (SELECT COUNT(*) FROM tbl_student_class WHERE class_id = ?) *
                 (SELECT COUNT(*) FROM tbl_subject_class WHERE class_id = ?)
             )
             ORDER BY FIELD(g.quarter, '1st', '2nd', '3rd', '4th')
@@ -1049,14 +1050,15 @@ class AdminModel {
                    sub.subject_name,
                    g.written_work, g.performance_task, g.quarterly_exam, g.final_grade
             FROM tbl_student s
+            INNER JOIN tbl_student_class sc2  ON sc2.student_id = s.student_id
             INNER JOIN tbl_grade g            ON g.student_id = s.student_id
             INNER JOIN tbl_subject_class sc   ON g.subject_class_id = sc.subject_class_id
-                                             AND sc.class_id = ?
+                                             AND sc.class_id = sc2.class_id
             INNER JOIN tbl_subject sub        ON sc.subject_id = sub.subject_id
-            WHERE s.class_id = ? AND g.quarter = ?
+            WHERE sc2.class_id = ? AND g.quarter = ?
             ORDER BY s.student_lname ASC, s.student_fname ASC, sub.subject_name ASC
         ");
-        $stmt->bind_param("iis", $classId, $classId, $quarter);
+        $stmt->bind_param("is", $classId, $quarter);
         $stmt->execute();
         return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     }

@@ -47,10 +47,10 @@ function isActive($page) {
                     <span><i class="bi bi-person-lines-fill me-1"></i> Student List</span>
                 </a>
                 <a href="/ewgs/admin/assign/student" class="nav-link ps-2 <?= isActive('assign/student') && !isActive('assign/student/enrolled') ? 'active' : '' ?>">
-                    <span><i class="bi bi-person-plus me-1"></i> Enroll Students</span>
+                    <span><i class="bi bi-person-plus me-1"></i> Link to Class</span>
                 </a>
                 <a href="/ewgs/admin/assign/student/enrolled" class="nav-link ps-2 <?= isActive('assign/student/enrolled') ?>">
-                    <span><i class="bi bi-card-checklist me-1"></i> Enrolled Students</span>
+                    <span><i class="bi bi-card-checklist me-1"></i> Linked Students</span>
                 </a>
             </div>
 

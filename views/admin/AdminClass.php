@@ -125,9 +125,9 @@
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label for="add_teacher_id" class="form-label">Assign Teacher <small class="text-muted">(optional)</small></label>
+                            <label for="add_teacher_id" class="form-label">Assign Teacher</label>
                             <select class="form-select" id="add_teacher_id" name="teacher_id">
-                                <option value="">-- No Teacher --</option>
+                                <option value="">-- Select Teacher --</option>
                                 <?php foreach ($teachers as $t): ?>
                                     <option value="<?= $t['teacher_id'] ?>">
                                         <?= htmlspecialchars($t['teacher_lname'] . ', ' . $t['teacher_fname']) ?>
@@ -175,9 +175,9 @@
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label for="edit_teacher_id" class="form-label">Assign Teacher <small class="text-muted">(optional)</small></label>
+                            <label for="edit_teacher_id" class="form-label">Assign Teacher</label>
                             <select class="form-select" id="edit_teacher_id" name="teacher_id">
-                                <option value="">-- No Teacher --</option>
+                                <option value="">-- Select Teacher --</option>
                                 <?php foreach ($teachers as $t): ?>
                                     <option value="<?= $t['teacher_id'] ?>">
                                         <?= htmlspecialchars($t['teacher_lname'] . ', ' . $t['teacher_fname']) ?>
@@ -279,10 +279,11 @@
             $('#addClassForm').on('submit', function (e) {
                 e.preventDefault();
                 if (!validateForm([
-                    { el: $('#class_name'),  label: 'Section Name', required: true, minLen: 2 },
-                    { el: $('#grade_level'), label: 'Grade Level',  required: true, digits: true,
+                    { el: $('#class_name'),    label: 'Section Name', required: true, minLen: 2 },
+                    { el: $('#grade_level'),   label: 'Grade Level',  required: true, digits: true,
                       pattern: /^[1-6]$/, patternMsg: 'Grade Level must be a number from 1 to 6.' },
-                    { el: $('#school_year'), label: 'School Year',  required: true }
+                    { el: $('#school_year'),   label: 'School Year',  required: true },
+                    { el: $('#add_teacher_id'), label: 'Teacher',     required: true }
                 ])) return;
                 var $btn = $(this).find('[type=submit]').prop('disabled', true);
                 bootstrap.Modal.getInstance(document.getElementById('addClassModal'))?.hide();
@@ -355,10 +356,11 @@
             $('#editClassForm').on('submit', function (e) {
                 e.preventDefault();
                 if (!validateForm([
-                    { el: $('#editClassName'),  label: 'Section Name', required: true, minLen: 2 },
-                    { el: $('#editClassGrade'), label: 'Grade Level',  required: true, digits: true,
+                    { el: $('#editClassName'),   label: 'Section Name', required: true, minLen: 2 },
+                    { el: $('#editClassGrade'),  label: 'Grade Level',  required: true, digits: true,
                       pattern: /^[1-6]$/, patternMsg: 'Grade Level must be a number from 1 to 6.' },
-                    { el: $('#editClassYear'),  label: 'School Year',  required: true }
+                    { el: $('#editClassYear'),   label: 'School Year',  required: true },
+                    { el: $('#edit_teacher_id'), label: 'Teacher',      required: true }
                 ])) return;
                 var $btn = $(this).find('[type=submit]').prop('disabled', true);
                 $('#preloader').fadeIn(200);

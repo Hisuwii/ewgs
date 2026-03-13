@@ -132,6 +132,9 @@ HTML;
         $mail->setFrom(MAIL_FROM_EMAIL, MAIL_FROM_NAME);
         $mail->addAddress($email, $fname . ' ' . $lname);
 
+        $mail->CharSet  = PHPMailer::CHARSET_UTF8;
+        $mail->Encoding = PHPMailer::ENCODING_BASE64;
+
         $mail->isHTML(true);
         $mail->Subject = $subject;
         $mail->Body    = $body;

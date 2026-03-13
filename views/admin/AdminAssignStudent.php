@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enroll Students | EWGS</title>
+    <title>Link Students to Class | EWGS</title>
     <?php require_once 'views/templates/admin/header.php'; ?>
     <?php require_once 'views/templates/admin/modal.php'; ?>
     <?php require_once 'views/templates/admin/datatable.php'; ?>
@@ -55,16 +55,16 @@
 
 <div class="main-content">
     <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <h4 class="mb-0"><i class="bi bi-person-plus me-2"></i>Enroll Students to Class</h4>
+        <h4 class="mb-0"><i class="bi bi-person-plus me-2"></i>Link Students to Class</h4>
         <a href="/ewgs/admin/assign/student/enrolled" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-person-lines-fill me-1"></i>View Enrollments
+            <i class="bi bi-person-lines-fill me-1"></i>View Linked Students
         </a>
     </div>
 
     <!-- Enroll Controls -->
     <div class="card shadow-sm mb-4 enroll-card">
         <div class="card-header">
-            <i class="bi bi-link-45deg me-2"></i>Enroll Selection
+            <i class="bi bi-link-45deg me-2"></i>Link Selection
         </div>
         <div class="card-body">
             <div class="row g-3 align-items-end">
@@ -81,7 +81,7 @@
                 </div>
                 <div class="col-md-auto">
                     <button id="btnEnroll" class="btn" disabled>
-                        <i class="bi bi-person-check me-1"></i>Enroll Selected
+                        <i class="bi bi-person-check me-1"></i>Link Selected
                         <span class="sel-badge" id="selCount">0</span>
                     </button>
                 </div>
@@ -93,7 +93,7 @@
     <div class="card shadow-sm enroll-card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-people me-2"></i>All Students</span>
-            <small class="fw-normal opacity-75">Check students, select a class, then click Enroll Selected.</small>
+            <small class="fw-normal opacity-75">Check students, select a class, then click Link Selected.</small>
         </div>
         <div class="card-body">
             <table id="studentsTable" class="table table-hover w-100">
@@ -214,8 +214,8 @@ $(function () {
             { student_ids: Array.from(selectedIds), class_id: currentClassId },
             function (res) {
                 if (res.success) {
-                    var msg = res.enrolled + ' student(s) enrolled.';
-                    if (res.skipped > 0) msg += ' ' + res.skipped + ' already enrolled (skipped).';
+                    var msg = res.enrolled + ' student(s) linked to class.';
+                    if (res.skipped > 0) msg += ' ' + res.skipped + ' already linked (skipped).';
                     showToast('success', msg);
                     selectedIds.clear();
                     table.ajax.reload(null, false);

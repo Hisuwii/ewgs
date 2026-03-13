@@ -54,6 +54,11 @@ class ClassController
 
         $adminId   = $_SESSION['user_id'] ?? null;
         $teacherId = (int) ($_POST['teacher_id'] ?? 0);
+
+        if (!$teacherId) {
+            $this->jsonResponse(false, 'A teacher must be assigned to the class.');
+        }
+
         $data = [
             'class_name'  => trim($_POST['class_name']),
             'grade_level' => trim($_POST['grade_level']),
@@ -97,6 +102,11 @@ class ClassController
         }
         $id        = (int) ($_POST['class_id']   ?? 0);
         $teacherId = (int) ($_POST['teacher_id'] ?? 0);
+
+        if (!$teacherId) {
+            $this->jsonResponse(false, 'A teacher must be assigned to the class.');
+        }
+
         $data = [
             'class_name'  => trim($_POST['class_name']  ?? ''),
             'grade_level' => trim($_POST['grade_level'] ?? ''),

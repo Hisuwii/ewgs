@@ -172,18 +172,28 @@
 
     <!-- Flash message (e.g. registration success) -->
     <?php
-    $flash = $_SESSION['flash'] ?? null;
-    if ($flash) unset($_SESSION['flash']);
+    $flashColors = ['success' => '#2e7d32', 'error' => '#b02a37', 'warning' => '#856404', 'info' => '#1565c0'];
+    $flashIcons  = ['success' => 'bi-check-circle', 'error' => 'bi-x-circle', 'warning' => 'bi-exclamation-circle', 'info' => 'bi-info-circle'];
+    $flashType    = null;
+    $flashMessage = null;
+    foreach (['success', 'error', 'warning', 'info'] as $t) {
+        if (!empty($_SESSION['flash'][$t])) {
+            $flashType    = $t;
+            $flashMessage = $_SESSION['flash'][$t];
+            unset($_SESSION['flash'][$t]);
+            break;
+        }
+    }
     ?>
-    <?php if ($flash): ?>
+    <?php if ($flashType): ?>
     <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:9999;">
         <div id="flashToast" class="toast align-items-center text-white border-0"
-             style="background-color:<?= $flash['type'] === 'success' ? '#2e7d32' : '#b02a37' ?>;"
+             style="background-color:<?= $flashColors[$flashType] ?>;"
              role="alert" aria-live="assertive">
             <div class="d-flex">
                 <div class="toast-body">
-                    <i class="bi <?= $flash['type'] === 'success' ? 'bi-check-circle' : 'bi-x-circle' ?> me-2"></i>
-                    <?= htmlspecialchars($flash['message']) ?>
+                    <i class="bi <?= $flashIcons[$flashType] ?> me-2"></i>
+                    <?= htmlspecialchars($flashMessage) ?>
                 </div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enrolled Students | EWGS</title>
+    <title>Linked Students | EWGS</title>
     <?php require_once 'views/templates/admin/header.php'; ?>
     <?php require_once 'views/templates/admin/modal.php'; ?>
     <?php require_once 'views/templates/admin/datatable.php'; ?>
@@ -25,9 +25,9 @@
 
 <div class="main-content">
     <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <h4 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Enrolled Students</h4>
+        <h4 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Linked Students</h4>
         <a href="/ewgs/admin/assign/student" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-person-plus me-1"></i>Enroll Students
+            <i class="bi bi-person-plus me-1"></i>Link Students to Class
         </a>
     </div>
 
@@ -77,7 +77,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Remove Enrollment</h5>
+                <h5 class="modal-title">Remove Class Link</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -155,7 +155,7 @@ $(function () {
             { student_id: pendingStudentId, class_id: pendingClassId },
             function (res) {
                 if (res.success) {
-                    showToast('success', 'Student removed from class.');
+                    showToast('success', 'Student unlinked from class.');
                     table.ajax.reload(null, false);
                 } else {
                     showToast('error', 'Failed to remove. Please try again.');

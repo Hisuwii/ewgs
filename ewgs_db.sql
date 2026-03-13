@@ -96,8 +96,8 @@ CREATE TABLE tbl_subject_class (
 -- student_lrn: replaces lrn (document assumption)
 -- student_gender: replaces gender (document assumption)
 -- birth_date: replaces age (document assumption)
--- Direct class_id FK (nullable) on tbl_student — students imported first,
--- assigned to a class later. 1 student = 1 class only.
+-- Class assignment handled via tbl_student_class (many-to-many)
+-- A student belongs to one class per school year but can span multiple years
 -- ============================================================
 CREATE TABLE tbl_student (
     student_id INT PRIMARY KEY AUTO_INCREMENT,
@@ -106,11 +106,23 @@ CREATE TABLE tbl_student (
     student_lrn VARCHAR(20) NOT NULL UNIQUE,
     birth_date DATE NOT NULL,
     student_gender ENUM('Male', 'Female') NOT NULL,
-    class_id INT DEFAULT NULL COMMENT 'Nullable: assigned to a class later',
     admin_id INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (class_id) REFERENCES tbl_class(class_id) ON DELETE SET NULL,
     FOREIGN KEY (admin_id) REFERENCES tbl_admin(admin_id) ON DELETE SET NULL
+);
+
+-- ============================================================
+-- tbl_student_class
+-- Bridge table: student ↔ class (M:N across school years)
+-- A student belongs to one class per school year
+-- ============================================================
+CREATE TABLE tbl_student_class (
+    student_class_id INT PRIMARY KEY AUTO_INCREMENT,
+    student_id INT NOT NULL,
+    class_id INT NOT NULL,
+    UNIQUE KEY unique_student_class (student_id, class_id),
+    FOREIGN KEY (student_id) REFERENCES tbl_student(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (class_id) REFERENCES tbl_class(class_id) ON DELETE CASCADE
 );
 
 -- ============================================================
