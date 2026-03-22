@@ -44,38 +44,36 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($classes)): ?>
-                            <tr><td colspan="5" class="text-muted">No classes assigned to you yet.</td></tr>
-                        <?php else: ?>
-                            <?php foreach ($classes as $i => $c): ?>
-                                <tr data-class-id="<?= (int) $c['class_id'] ?>">
-                                    <td><?= $i + 1 ?></td>
-                                    <td><?= htmlspecialchars($c['class_name']) ?></td>
-                                    <td>Grade <?= htmlspecialchars($c['grade_level']) ?></td>
-                                    <td>
-                                        <span class="sy-badge">
-                                            <i class="bi bi-calendar3"></i>
-                                            <?= htmlspecialchars($c['school_year']) ?>
-                                        </span>
-                                    </td>
-                                    <td class="student-count"><?= (int) $c['student_count'] ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                        <?php foreach ($classes as $i => $c): ?>
+                            <tr data-class-id="<?= (int) $c['class_id'] ?>">
+                                <td><?= $i + 1 ?></td>
+                                <td><?= htmlspecialchars($c['class_name']) ?></td>
+                                <td>Grade <?= htmlspecialchars($c['grade_level']) ?></td>
+                                <td>
+                                    <span class="sy-badge">
+                                        <i class="bi bi-calendar3"></i>
+                                        <?= htmlspecialchars($c['school_year']) ?>
+                                    </span>
+                                </td>
+                                <td class="student-count"><?= (int) $c['student_count'] ?></td>
+                            </tr>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <?php require_once 'views/templates/user/datatable.php'; ?>
     <script>
         $(function () {
-            $('#classTable').DataTable();
+            $('#classTable').DataTable({
+                language: { emptyTable: 'No classes are assigned to you yet.' }
+            });
 
             function refreshClassStats() {
-                $.getJSON('/ewgs/user/my-classes/stats', function (data) {
+                $.getJSON('<?= BASE ?>/user/my-classes/stats', function (data) {
                     $.each(data, function (_, item) {
                         var $cell   = $('#classTable tbody tr[data-class-id="' + item.class_id + '"] td.student-count');
                         var current = parseInt($cell.text(), 10);
@@ -86,7 +84,7 @@
                     });
                 });
             }
-            setInterval(refreshClassStats, 10000);
+            smartPoll(refreshClassStats, 15000);
         });
     </script>
 </body>

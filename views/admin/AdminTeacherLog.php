@@ -58,19 +58,23 @@
         </div>
     </div>
 
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <?php require_once 'views/templates/admin/datatable.php'; ?>
     <script>
         $(document).ready(function () {
             $('#logTable').DataTable({
+                serverSide: true,
+                processing: true,
+                searchDelay: 500,
+                order: [],
                 ajax: {
-                    url: '/ewgs/admin/teacher/logs/data',
+                    url: '<?= BASE ?>/admin/teacher/logs/data',
                     type: 'GET',
                     dataSrc: 'data'
                 },
-                order: [[1, 'asc']],
                 columns: [
-                    { data: 'count', width: '4%' },
+                    { data: null, orderable: false, searchable: false, width: '4%',
+                      render: function(data, type, row, meta) { return meta.row + meta.settings._iDisplayStart + 1; } },
                     { data: 'teacher_name' },
                     { data: 'teacher_email' },
                     {

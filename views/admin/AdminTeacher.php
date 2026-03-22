@@ -103,7 +103,7 @@
     <div class="modal fade" id="addTeacherModal" tabindex="-1" aria-labelledby="addTeacherModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form id="addTeacherForm" method="POST" action="/ewgs/admin/teacher/add">
+                <form id="addTeacherForm" method="POST" action="<?= BASE ?>/admin/teacher/add">
                     <div class="modal-header">
                         <h5 class="modal-title" id="addTeacherModalLabel">Add New Teacher</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -138,7 +138,7 @@
     <div class="modal fade" id="editTeacherModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form id="editTeacherForm" method="POST" action="/ewgs/admin/teacher/edit">
+                <form id="editTeacherForm" method="POST" action="<?= BASE ?>/admin/teacher/edit">
                     <input type="hidden" name="teacher_id" id="editTeacherId">
                     <div class="modal-header">
                         <h5 class="modal-title">Edit Teacher</h5>
@@ -171,7 +171,7 @@
     <div class="modal fade" id="deleteTeacherModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <form id="deleteTeacherForm" method="POST" action="/ewgs/admin/teacher/delete">
+                <form id="deleteTeacherForm" method="POST" action="<?= BASE ?>/admin/teacher/delete">
                     <input type="hidden" name="teacher_id" id="deleteTeacherId">
                     <div class="modal-header">
                         <h5 class="modal-title">Delete Teacher</h5>
@@ -216,19 +216,25 @@
         </div>
     </div>
 
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <?php require_once 'views/templates/admin/datatable.php'; ?>
     <script>
         $(document).ready(function () {
             var pendingDeleteRow = null;
+            var origTeacherSnap  = '';
             var table = $('#teacherTable').DataTable({
+                serverSide: true,
+                processing: true,
+                searchDelay: 500,
+                order: [],
                 ajax: {
-                    url: '/ewgs/admin/teacher/data',
+                    url: '<?= BASE ?>/admin/teacher/data',
                     type: 'GET',
                     dataSrc: 'data'
                 },
                 columns: [
-                    { data: 'count', width: '5%' },
+                    { data: null, orderable: false, searchable: false, width: '5%',
+                      render: function(data, type, row, meta) { return meta.row + meta.settings._iDisplayStart + 1; } },
                     { data: 'teacher_fname' },
                     { data: 'teacher_lname' },
                     { data: 'teacher_email' },
@@ -277,13 +283,23 @@
                     emptyTable: 'No teachers found.'
                 }
             });
+            // Auto-refresh every 15s; fires immediately on tab focus if a refresh was missed
+            (function () {
+                var missed = false;
+                setInterval(function () {
+                    if (document.hidden) { missed = true; } else { table.ajax.reload(null, false); }
+                }, 15000);
+                document.addEventListener('visibilitychange', function () {
+                    if (!document.hidden && missed) { missed = false; table.ajax.reload(null, false); }
+                });
+            })();
 
             /* ── Add teacher AJAX ──────────────────────────────── */
             $('#addTeacherForm').on('submit', function (e) {
                 e.preventDefault();
                 if (!validateForm([
-                    { el: $('#teacher_fname'), label: 'First Name', required: true, minLen: 2 },
-                    { el: $('#teacher_lname'), label: 'Last Name',  required: true, minLen: 2 },
+                    { el: $('#teacher_fname'), label: 'First Name', required: true, minLen: 2, noDigits: true },
+                    { el: $('#teacher_lname'), label: 'Last Name',  required: true, minLen: 2, noDigits: true },
                     { el: $('#teacher_email'), label: 'Email',      required: true, email: true }
                 ])) return;
                 var $btn = $(this).find('[type=submit]').prop('disabled', true);
@@ -317,7 +333,7 @@
                 var $btn = $(this).prop('disabled', true);
                 var id   = $(this).data('id');
                 $.ajax({
-                    url: '/ewgs/admin/teacher/toggle-status',
+                    url: '<?= BASE ?>/admin/teacher/toggle-status',
                     type: 'POST',
                     data: { teacher_id: id },
                     dataType: 'json',
@@ -339,7 +355,7 @@
                 var id    = $(this).data('id');
                 var name  = $(this).data('name');
                 $.ajax({
-                    url: '/ewgs/admin/teacher/reset-password',
+                    url: '<?= BASE ?>/admin/teacher/reset-password',
                     type: 'POST',
                     data: { teacher_id: id },
                     dataType: 'json',
@@ -397,18 +413,103 @@
                 $('#editTeacherFname').val($(this).data('fname'));
                 $('#editTeacherLname').val($(this).data('lname'));
                 $('#editTeacherEmail').val($(this).data('email'));
+                origTeacherSnap = $('#editTeacherForm').serialize();
+                liveNameCheck($('#editTeacherFname'), 'First Name');
+                liveNameCheck($('#editTeacherLname'), 'Last Name');
                 bootstrap.Modal.getOrCreateInstance(document.getElementById('editTeacherModal')).show();
             });
 
+            // ── Email uniqueness check ───────────────────────────────
+            function emailFeedback($input, available) {
+                var $fb = $input.siblings('.email-feedback');
+                if (!$fb.length) $fb = $('<small class="email-feedback d-block mt-1"></small>').insertAfter($input);
+                var $btn = $input.closest('form').find('[type=submit]');
+                if (available === null) {
+                    $fb.text('').removeClass('text-success text-danger');
+                    $btn.prop('disabled', false);
+                } else if (available) {
+                    $fb.text('✓ Email is available').removeClass('text-danger').addClass('text-success');
+                    $btn.prop('disabled', false);
+                } else {
+                    $fb.text('✗ Email already in use').removeClass('text-success').addClass('text-danger');
+                    $btn.prop('disabled', true);
+                }
+            }
+
+            function checkEmail($input, excludeId) {
+                var email = $input.val().trim();
+                if (!email || !email.includes('@')) { emailFeedback($input, null); return; }
+                var params = { email: email };
+                if (excludeId) params.exclude_id = excludeId;
+                $.getJSON('<?= BASE ?>/admin/teacher/check-email', params, function (res) {
+                    emailFeedback($input, res.available);
+                });
+            }
+
+            // Live name validation
+            // Valid/empty branches run synchronously for immediate visual feedback.
+            // Invalid branch uses setTimeout so it runs after the global is-invalid
+            // clear handler in sidebar.php (which fires synchronously on input).
+            function liveNameCheck($el, label) {
+                var val = $el.val().trim();
+                var $btn = $el.closest('form').find('[type=submit]');
+                if (val === '') {
+                    $el.next('.name-invalid-feedback').remove();
+                    $el.removeClass('is-valid is-invalid');
+                    $btn.prop('disabled', false);
+                } else if (/[^a-zA-ZÀ-ÿ\s'\-]/.test(val)) {
+                    setTimeout(function () {
+                        var v = $el.val().trim();
+                        $el.next('.name-invalid-feedback').remove();
+                        if (/[^a-zA-ZÀ-ÿ\s'\-]/.test(v)) {
+                            $el.removeClass('is-valid').addClass('is-invalid')
+                               .after('<div class="name-invalid-feedback invalid-feedback">' + label + ' must only contain letters.</div>');
+                            $btn.prop('disabled', true);
+                        } else {
+                            $el.removeClass('is-invalid').addClass('is-valid');
+                            $btn.prop('disabled', false);
+                        }
+                    }, 0);
+                } else {
+                    $el.next('.name-invalid-feedback').remove();
+                    $el.removeClass('is-invalid').addClass('is-valid');
+                    $btn.prop('disabled', false);
+                }
+            }
+
+            $('#teacher_fname, #teacher_lname, #editTeacherFname, #editTeacherLname').on('input change blur', function () {
+                liveNameCheck($(this), $(this).is('#teacher_fname, #editTeacherFname') ? 'First Name' : 'Last Name');
+            });
+
+            var emailTimer;
+            $('#teacher_email').on('input', function () {
+                clearTimeout(emailTimer);
+                var $el = $(this);
+                emailTimer = setTimeout(function () { checkEmail($el, null); }, 300);
+            });
+            $('#editTeacherEmail').on('input', function () {
+                clearTimeout(emailTimer);
+                var $el = $(this);
+                emailTimer = setTimeout(function () { checkEmail($el, $('#editTeacherId').val()); }, 300);
+            });
+
+            $('#addTeacherModal').on('hidden.bs.modal', function () {
+                emailFeedback($('#teacher_email'), null);
+            });
             $('#editTeacherModal').on('hidden.bs.modal', function () {
                 clearFormValidation($('#editTeacherForm'));
+                emailFeedback($('#editTeacherEmail'), null);
             });
 
             $('#editTeacherForm').on('submit', function (e) {
                 e.preventDefault();
+                if ($('#editTeacherForm').serialize() === origTeacherSnap) {
+                    showToast('warning', 'No changes were made.');
+                    return;
+                }
                 if (!validateForm([
-                    { el: $('#editTeacherFname'), label: 'First Name', required: true, minLen: 2 },
-                    { el: $('#editTeacherLname'), label: 'Last Name',  required: true, minLen: 2 },
+                    { el: $('#editTeacherFname'), label: 'First Name', required: true, minLen: 2, noDigits: true },
+                    { el: $('#editTeacherLname'), label: 'Last Name',  required: true, minLen: 2, noDigits: true },
                     { el: $('#editTeacherEmail'), label: 'Email',      required: true, email: true }
                 ])) return;
                 var $btn = $(this).find('[type=submit]').prop('disabled', true);

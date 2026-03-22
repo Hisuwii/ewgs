@@ -80,32 +80,28 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($classes)): ?>
-                            <tr><td colspan="7" class="text-muted">No classes assigned to you yet.</td></tr>
-                        <?php else: ?>
-                            <?php foreach ($classes as $i => $c): ?>
-                                <tr data-class-id="<?= (int) $c['class_id'] ?>">
-                                    <td><?= $i + 1 ?></td>
-                                    <td><?= htmlspecialchars($c['class_name']) ?></td>
-                                    <td>Grade <?= htmlspecialchars($c['grade_level']) ?></td>
-                                    <td><?= htmlspecialchars($c['school_year']) ?></td>
-                                    <td class="student-count"><?= (int) $c['student_count'] ?></td>
-                                    <td class="grade-status"><span class="badge-none">No Grades Yet</span></td>
-                                    <td>
-                                        <a href="/ewgs/user/grade/manage/<?= $c['class_id'] ?>" class="btn btn-sm btn-manage me-1">
-                                            <i class="bi bi-pencil-square"></i> Manage
-                                        </a>
-                                        <button class="btn-export btn-export-pdf"
-                                                data-class-id="<?= (int) $c['class_id'] ?>"
-                                                data-class-name="<?= htmlspecialchars($c['class_name']) ?>"
-                                                data-grade-level="<?= htmlspecialchars($c['grade_level']) ?>"
-                                                data-school-year="<?= htmlspecialchars($c['school_year']) ?>">
-                                            <i class="bi bi-file-earmark-pdf me-1"></i>Export PDF
-                                        </button>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                        <?php foreach ($classes as $i => $c): ?>
+                            <tr data-class-id="<?= (int) $c['class_id'] ?>">
+                                <td><?= $i + 1 ?></td>
+                                <td><?= htmlspecialchars($c['class_name']) ?></td>
+                                <td>Grade <?= htmlspecialchars($c['grade_level']) ?></td>
+                                <td><?= htmlspecialchars($c['school_year']) ?></td>
+                                <td class="student-count"><?= (int) $c['student_count'] ?></td>
+                                <td class="grade-status"><span class="badge-none">No Grades Yet</span></td>
+                                <td>
+                                    <a href="<?= BASE ?>/user/grade/manage/<?= $c['class_id'] ?>" class="btn btn-sm btn-manage me-1">
+                                        <i class="bi bi-pencil-square"></i> Manage
+                                    </a>
+                                    <button class="btn-export btn-export-pdf"
+                                            data-class-id="<?= (int) $c['class_id'] ?>"
+                                            data-class-name="<?= htmlspecialchars($c['class_name']) ?>"
+                                            data-grade-level="<?= htmlspecialchars($c['grade_level']) ?>"
+                                            data-school-year="<?= htmlspecialchars($c['school_year']) ?>">
+                                        <i class="bi bi-file-earmark-pdf me-1"></i>Export PDF
+                                    </button>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
@@ -138,29 +134,29 @@
         </div>
     </div>
 
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <?php require_once 'views/templates/user/datatable.php'; ?>
     <script>
         $(document).ready(function() {
-            $('#manageGradeTable').DataTable();
+            $('#manageGradeTable').DataTable({
+                language: { emptyTable: 'No classes are assigned to you yet.' }
+            });
 
             function refreshManageGradeStats() {
-                $.getJSON('/ewgs/user/manage-grades/stats', function (data) {
+                $.getJSON('<?= BASE ?>/user/manage-grades/stats', function (data) {
                     data.forEach(function (item) {
                         var $row = $('tr[data-class-id="' + item.class_id + '"]');
                         if (!$row.length) return;
 
                         $row.find('.student-count').text(item.student_count);
 
-                        var gradeCount = parseInt(item.grade_count,  10);
-                        var expected   = parseInt(item.student_count, 10)
-                                       * parseInt(item.subject_count, 10)
-                                       * 4; // 4 quarters
+                        var gradeCount  = parseInt(item.grade_count, 10);
+                        var isComplete  = parseInt(item.is_complete, 10);
 
                         var statusHtml;
                         if (gradeCount === 0) {
                             statusHtml = '<span class="badge-none">No Grades Yet</span>';
-                        } else if (expected > 0 && gradeCount >= expected) {
+                        } else if (isComplete) {
                             statusHtml = '<span class="badge-complete">Complete</span>';
                         } else {
                             statusHtml = '<span class="badge-incomplete">Incomplete</span>';
@@ -170,9 +166,8 @@
                 });
             }
 
-            // Initial load + poll every 10 seconds
-            refreshManageGradeStats();
-            setInterval(refreshManageGradeStats, 10000);
+            // Poll every 15s, pauses when tab is hidden
+            smartPoll(refreshManageGradeStats, 15000);
 
             // ── Export PDF ─────────────────────────────────────────
             var exportClassId   = null;
@@ -191,7 +186,7 @@
                 $('#exportModalError').hide();
                 $('#btnGeneratePDF').prop('disabled', false);
 
-                $.getJSON('/ewgs/user/grade/export-check/' + exportClassId)
+                $.getJSON('<?= BASE ?>/user/grade/export-check/' + exportClassId)
                     .done(function (quarters) {
                         if (!quarters.length) {
                             $('#exportModalError').text('No quarter has all students fully graded yet. Please complete grading before exporting.').show();
@@ -223,7 +218,7 @@
                 $('#exportModalError').hide();
                 var $btn = $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Generating…');
 
-                $.getJSON('/ewgs/user/grade/export-data/' + exportClassId, { quarter: quarter })
+                $.getJSON('<?= BASE ?>/user/grade/export-data/' + exportClassId, { quarter: quarter })
                     .done(function (res) {
                         $('#exportModal').modal('hide');
                         buildGradesPDF(res.class, res.rows, quarter);

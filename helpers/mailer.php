@@ -15,9 +15,9 @@ require_once __DIR__ . '/../vendor/phpmailer/phpmailer/src/SMTP.php';
 function sendTeacherCredentials($email, $fname, $lname, $password, $isReset = false) {
     $name   = htmlspecialchars($fname . ' ' . $lname);
     $portal = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-            . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/ewgs/';
+            . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE . '/';
 
-    $subject    = $isReset ? 'Your EWGS Password Has Been Reset' : 'Welcome to EWGS — Your Account is Ready';
+    $subject    = $isReset ? 'Your EWGS Password Has Been Reset' : 'Welcome to EWGS - Your Account is Ready';
     $headline   = $isReset ? 'Password Reset' : 'Account Created';
     $intro      = $isReset
         ? "Your password for the <strong>Elementary Web Grading System (EWGS)</strong> has been reset by your administrator. Use the temporary password below to log in."

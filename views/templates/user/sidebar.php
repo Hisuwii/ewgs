@@ -16,29 +16,29 @@ if (!function_exists('isActive')) {
 
 <div class="sidebar">
     <div class="logo">
-        <img src="/ewgs/public/images/logo.png" alt="Logo">
+        <img src="<?= BASE ?>/public/images/logo.png" alt="Logo">
         <h5>Elementary Web Grading System</h5>
     </div>
 
     <div class="sidebar-body">
         <nav class="nav flex-column px-3">
-            <a href="/ewgs/user/dashboard" class="nav-link <?= isActive('user/dashboard') ?>">
+            <a href="<?= BASE ?>/user/dashboard" class="nav-link <?= isActive('user/dashboard') ?>">
                 <span><i class="bi bi-speedometer2"></i> Dashboard</span>
             </a>
 
-            <a href="/ewgs/user/my-classes" class="nav-link <?= isActive('my-classes') ?>">
+            <a href="<?= BASE ?>/user/my-classes" class="nav-link <?= isActive('my-classes') ?>">
                 <span><i class="bi bi-people"></i> My Classes</span>
             </a>
 
-            <a href="/ewgs/user/add-grade" class="nav-link <?= isActive('add-grade') ?>">
+            <a href="<?= BASE ?>/user/add-grade" class="nav-link <?= isActive('add-grade') ?>">
                 <span><i class="bi bi-plus-circle"></i> Add Grades</span>
             </a>
 
-            <a href="/ewgs/user/manage-grades" class="nav-link <?= isActive('manage-grades') ?>">
+            <a href="<?= BASE ?>/user/manage-grades" class="nav-link <?= isActive('manage-grades') ?>">
                 <span><i class="bi bi-clipboard-data"></i> Manage Grades</span>
             </a>
 
-            <a href="/ewgs/user/reports" class="nav-link <?= isActive('user/reports') ?>">
+            <a href="<?= BASE ?>/user/reports" class="nav-link <?= isActive('user/reports') ?>">
                 <span><i class="bi bi-file-earmark-text"></i> Reports</span>
             </a>
         </nav>
@@ -52,19 +52,28 @@ if (!function_exists('isActive')) {
                 <small>Teacher</small>
             </div>
         </div>
-        <div class="dropdown">
-            <button class="btn dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown">
+        <div class="dropdown dropup">
+            <button class="btn dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="bi bi-three-dots-vertical"></i>
             </button>
-            <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="/ewgs/user/profile">Profile</a></li>
-                <li class="dropdown-item d-flex justify-content-between align-items-center" style="min-width: 160px;">
-                    <span>Appearance</span>
-                    <div class="form-check form-switch m-0 ms-4">
-                        <input class="form-check-input" type="checkbox" role="switch" id="mode-toggle">
-                    </div>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="<?= BASE ?>/user/profile">
+                    <i class="bi bi-person"></i> Profile
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <label class="dropdown-item" style="cursor:pointer;">
+                        <i class="bi bi-moon-stars"></i>
+                        <span style="flex:1;">Dark Mode</span>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="mode-toggle">
+                        </div>
+                    </label>
                 </li>
-                <li><a class="dropdown-item" href="/ewgs/user/logout">Logout</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-danger" href="<?= BASE ?>/user/logout">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </a></li>
             </ul>
         </div>
     </div>
@@ -248,8 +257,8 @@ $(document).ready(function(){
             $('#preloader').fadeOut(400);
         }
     }
-    $(window).on('load', hidePreloader);
-    setTimeout(hidePreloader, 3000); // max wait 3 s — prevents stuck preloader if a resource stalls
+    hidePreloader(); // hide as soon as DOM is ready — don't wait for CDN scripts
+    $(window).on('load', hidePreloader); // fallback if somehow DOM ready fires before this
 
     // ========== DARK MODE ==========
     var isDarkMode = localStorage.getItem('darkMode');
@@ -318,7 +327,7 @@ $(document).ready(function(){
 (function () {
     var WARN_AT    = 25 * 60 * 1000;
     var LOGOUT_AT  = 30 * 60 * 1000;
-    var LOGOUT_URL = '/ewgs/user/logout';
+    var LOGOUT_URL = '<?= BASE ?>/user/logout';
     var warnTimer, logoutTimer;
     var $modal, modalInstance;
 
@@ -348,7 +357,7 @@ $(document).ready(function(){
         $('#btnStayLoggedIn').on('click', function () {
             modalInstance.hide();
             resetTimers();
-            $.get('/ewgs/user/dashboard/ping').always(function () {});
+            $.get('<?= BASE ?>/user/dashboard/ping').always(function () {});
         });
     }
 
@@ -444,18 +453,14 @@ window.addEventListener('load', function () {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
 
         $.ajax({
-            url: '/ewgs/user/change-password',
+            url: '<?= BASE ?>/user/change-password',
             type: 'POST',
             data: { new_password: newPw },
             dataType: 'json',
             success: function (res) {
                 if (res.success) {
                     pwModal.hide();
-                    var toast = $('<div class="toast-notification toast-success" style="display:flex;">' +
-                        '<i class="bi bi-check-circle-fill"></i>' +
-                        '<span>Password updated successfully!</span></div>');
-                    $('body').append(toast);
-                    toast.fadeIn().delay(3000).fadeOut(function () { toast.remove(); });
+                    showToast('success', 'Password updated successfully!');
                 } else {
                     errorEl.textContent = res.message;
                     errorEl.style.display = 'block';
@@ -472,5 +477,26 @@ window.addEventListener('load', function () {
         });
     });
 });
+
 <?php endif; ?>
+
+// Global helper — show a Bootstrap toast from JavaScript (matches admin & server flash style)
+function showToast(type, message) {
+    var bg    = { success: '#2e7d32', error: '#b02a37', warning: '#856404', info: '#1565c0' };
+    var icons = { success: 'bi-check-circle', error: 'bi-x-circle', warning: 'bi-exclamation-circle', info: 'bi-info-circle' };
+    var bgColor = bg[type]    || bg.info;
+    var icon    = icons[type] || 'bi-info-circle';
+    var $container = $('<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:9999;"></div>');
+    var $toast = $(
+        '<div class="toast align-items-center text-white border-0" role="alert" aria-live="assertive">' +
+        '<div class="d-flex">' +
+        '<div class="toast-body"><i class="bi ' + icon + ' me-2"></i>' + message + '</div>' +
+        '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>' +
+        '</div></div>'
+    ).css({ 'background-color': bgColor });
+    $container.append($toast);
+    $('body').append($container);
+    bootstrap.Toast.getOrCreateInstance($toast[0], { delay: 4000 }).show();
+    $toast[0].addEventListener('hidden.bs.toast', function () { $container.remove(); });
+}
 </script>

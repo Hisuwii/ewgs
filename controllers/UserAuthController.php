@@ -10,7 +10,7 @@ class UserAuthController
 
         // Already logged in → go to dashboard
         if (isset($_SESSION['teacher_logged_in']) && $_SESSION['teacher_logged_in'] === true) {
-            header('Location: /ewgs/user/dashboard');
+            header('Location: ' . BASE . '/user/dashboard');
             exit;
         }
 
@@ -59,7 +59,7 @@ class UserAuthController
 
             setFlash('success', 'Welcome, ' . $teacher['teacher_fname'] . ' ' . $teacher['teacher_lname'] . '!');
 
-            header('Location: /ewgs/user/dashboard');
+            header('Location: ' . BASE . '/user/dashboard');
             exit;
         } else {
             $error = 'Invalid email or password.';
@@ -99,7 +99,7 @@ class UserAuthController
         session_destroy();
         header('Cache-Control: no-store, no-cache, must-revalidate');
         header('Pragma: no-cache');
-        header('Location: /ewgs/');
+        header('Location: ' . BASE . '/');
         exit;
     }
 }

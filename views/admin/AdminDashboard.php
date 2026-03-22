@@ -228,7 +228,7 @@
                             <div class="stat-circle"><i class="bi bi-person-badge"></i></div>
                             <div class="stat-title">Total Teachers</div>
                             <div class="stat-count"><?= $stats['teachers'] ?></div>
-                            <a href="/ewgs/admin/teacher" class="stat-btn">Manage Teachers</a>
+                            <a href="<?= BASE ?>/admin/teacher" class="stat-btn">Manage Teachers</a>
                         </div>
                     </div>
                 </div>
@@ -239,7 +239,7 @@
                             <div class="stat-circle"><i class="bi bi-people"></i></div>
                             <div class="stat-title">Total Students</div>
                             <div class="stat-count"><?= $stats['students'] ?></div>
-                            <a href="/ewgs/admin/student" class="stat-btn">Manage Students</a>
+                            <a href="<?= BASE ?>/admin/student" class="stat-btn">Manage Students</a>
                         </div>
                     </div>
                 </div>
@@ -250,7 +250,7 @@
                             <div class="stat-circle"><i class="bi bi-door-open"></i></div>
                             <div class="stat-title">Total Classes</div>
                             <div class="stat-count"><?= $stats['classes'] ?></div>
-                            <a href="/ewgs/admin/class" class="stat-btn">Manage Classes</a>
+                            <a href="<?= BASE ?>/admin/class" class="stat-btn">Manage Classes</a>
                         </div>
                     </div>
                 </div>
@@ -261,7 +261,7 @@
                             <div class="stat-circle"><i class="bi bi-journal-bookmark"></i></div>
                             <div class="stat-title">Total Subjects</div>
                             <div class="stat-count"><?= $stats['subjects'] ?></div>
-                            <a href="/ewgs/admin/subject" class="stat-btn">Manage Subjects</a>
+                            <a href="<?= BASE ?>/admin/subject" class="stat-btn">Manage Subjects</a>
                         </div>
                     </div>
                 </div>
@@ -360,7 +360,7 @@
                         <div class="dash-card-header">
                             <i class="bi bi-lightning-charge"></i> Quick Actions
                         </div>
-                        <a href="/ewgs/admin/teacher" class="quick-action-link">
+                        <a href="<?= BASE ?>/admin/teacher" class="quick-action-link">
                             <div class="qa-icon green"><i class="bi bi-person-plus"></i></div>
                             <div>
                                 <div class="qa-label">Manage Teachers</div>
@@ -368,7 +368,7 @@
                             </div>
                             <i class="bi bi-chevron-right qa-arrow"></i>
                         </a>
-                        <a href="/ewgs/admin/student" class="quick-action-link">
+                        <a href="<?= BASE ?>/admin/student" class="quick-action-link">
                             <div class="qa-icon green"><i class="bi bi-person-lines-fill"></i></div>
                             <div>
                                 <div class="qa-label">Manage Students</div>
@@ -376,7 +376,7 @@
                             </div>
                             <i class="bi bi-chevron-right qa-arrow"></i>
                         </a>
-                        <a href="/ewgs/admin/class" class="quick-action-link">
+                        <a href="<?= BASE ?>/admin/class" class="quick-action-link">
                             <div class="qa-icon green"><i class="bi bi-building"></i></div>
                             <div>
                                 <div class="qa-label">Manage Classes</div>
@@ -384,7 +384,7 @@
                             </div>
                             <i class="bi bi-chevron-right qa-arrow"></i>
                         </a>
-                        <a href="/ewgs/admin/subject" class="quick-action-link">
+                        <a href="<?= BASE ?>/admin/subject" class="quick-action-link">
                             <div class="qa-icon green"><i class="bi bi-book"></i></div>
                             <div>
                                 <div class="qa-label">Manage Subjects</div>
@@ -392,7 +392,7 @@
                             </div>
                             <i class="bi bi-chevron-right qa-arrow"></i>
                         </a>
-                        <a href="/ewgs/admin/assign/student" class="quick-action-link">
+                        <a href="<?= BASE ?>/admin/assign/student" class="quick-action-link">
                             <div class="qa-icon green"><i class="bi bi-person-check"></i></div>
                             <div>
                                 <div class="qa-label">Link Students to a Class</div>
@@ -400,7 +400,7 @@
                             </div>
                             <i class="bi bi-chevron-right qa-arrow"></i>
                         </a>
-                        <a href="/ewgs/admin/assign/subject" class="quick-action-link">
+                        <a href="<?= BASE ?>/admin/assign/subject" class="quick-action-link">
                             <div class="qa-icon green"><i class="bi bi-journal-arrow-up"></i></div>
                             <div>
                                 <div class="qa-label">Link Subjects to a Class</div>
@@ -415,7 +415,7 @@
         </div>
     </div>
 
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <script>
         $(function () {
             $('.flash-toast').each(function () {

@@ -1,5 +1,5 @@
 <!-- DataTables CSS -->
-<link rel="stylesheet" href="/ewgs/public/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="<?= BASE ?>/public/css/dataTables.bootstrap5.min.css">
 
 <style>
     /* ── Override table-dark header to use theme green ──── */
@@ -170,7 +170,52 @@
         cursor: default;
     }
 
+    /* ── Processing indicator (override DT2 blue dots → green spinner) ── */
+    /* Do NOT set display here — DataTables controls show/hide via display:none */
+    div.dt-processing,
+    .dataTables_processing {
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        text-align: center !important;
+        background: rgba(255,255,255,0.88) !important;
+        border: none !important;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.1) !important;
+        border-radius: 12px !important;
+        padding: 20px !important;
+        width: auto !important;
+        min-width: 76px !important;
+        margin: 0 !important;
+        z-index: 10 !important;
+    }
+    /* Hide all default content (text + dots) */
+    div.dt-processing > *,
+    .dataTables_processing > * { display: none !important; }
+    /* Inject green spinner via ::after */
+    div.dt-processing::after,
+    .dataTables_processing::after {
+        content: '';
+        display: inline-block;
+        width: 36px;
+        height: 36px;
+        border: 4px solid #e8f5e9;
+        border-top-color: #2e4e2e;
+        border-radius: 50%;
+        animation: preloader-spin 0.75s linear infinite;
+    }
+
     /* ── Dark Mode ──────────────────────────────────────── */
+    body.dark-mode div.dt-processing,
+    body.dark-mode .dataTables_processing {
+        background: rgba(30,30,30,0.9) !important;
+    }
+    body.dark-mode div.dt-processing::after,
+    body.dark-mode .dataTables_processing::after {
+        border-color: #2a3f2a;
+        border-top-color: #4b6b4b;
+    }
+
     body.dark-mode .dataTables_wrapper {
         background: #1e1e1e;
         border-color: #2a2a2a;
@@ -182,11 +227,11 @@
     }
     body.dark-mode table.dataTable {
         background: #1e1e1e;
-        color: #e0e0e0;
+        color: #1a1a1a;
     }
     body.dark-mode table.dataTable tbody td {
         border-top-color: #2a2a2a !important;
-        color: #e0e0e0;
+        color: #1a1a1a;
     }
     body.dark-mode table.dataTable tbody tr:nth-child(even) {
         background-color: #252525;
@@ -357,5 +402,24 @@
 </style>
 
 <!-- DataTables JS -->
-<script src="/ewgs/public/js/jquery.dataTables.min.js"></script>
-<script src="/ewgs/public/js/dataTables.bootstrap5.min.js"></script>
+<script src="<?= BASE ?>/public/js/jquery.dataTables.min.js"></script>
+<script src="<?= BASE ?>/public/js/dataTables.bootstrap5.min.js"></script>
+<script>
+    // Suppress DataTables' built-in alert popup (tn/7) and show a toast instead
+    $.fn.dataTable.ext.errMode = 'none';
+
+    // Track tables that have had at least one successful draw
+    // so we don't show a toast for transient auto-refresh failures
+    var _dtLoaded = {};
+    $(document).on('draw.dt', function (e, settings) {
+        _dtLoaded[settings.nTable.id] = true;
+    });
+
+    $(document).on('error.dt', function (e, settings, techNote, message) {
+        console.error('[DataTables]', message);
+        // Only toast on initial load failure — auto-refresh failures are transient
+        if (!_dtLoaded[settings.nTable.id] && typeof showToast === 'function') {
+            showToast('error', 'Failed to load table data. Please refresh the page.');
+        }
+    });
+</script>

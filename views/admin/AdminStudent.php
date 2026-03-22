@@ -112,7 +112,7 @@
     <div class="modal fade" id="addStudentModal" tabindex="-1" aria-labelledby="addStudentModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form id="addStudentForm" method="POST" action="/ewgs/admin/student/add">
+                <form id="addStudentForm" method="POST" action="<?= BASE ?>/admin/student/add">
                     <div class="modal-header">
                         <h5 class="modal-title" id="addStudentModalLabel">Add New Student</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -157,7 +157,7 @@
     <div class="modal fade" id="importStudentModal" tabindex="-1" aria-labelledby="importStudentModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form id="importStudentForm" method="POST" action="/ewgs/admin/student/import" enctype="multipart/form-data">
+                <form id="importStudentForm" method="POST" action="<?= BASE ?>/admin/student/import" enctype="multipart/form-data">
                     <div class="modal-header">
                         <h5 class="modal-title" id="importStudentModalLabel">
                             <i class="bi bi-file-earmark-excel me-1"></i> Import Students
@@ -179,7 +179,7 @@
                                    name="import_file" accept=".xlsx,.csv" required>
                         </div>
                         <div class="text-center">
-                            <a href="/ewgs/admin/student/template" class="text-decoration-none small">
+                            <a href="<?= BASE ?>/admin/student/template" class="text-decoration-none small">
                                 <i class="bi bi-download me-1"></i>Download sample template (.xlsx)
                             </a>
                         </div>
@@ -197,7 +197,7 @@
     <div class="modal fade" id="editStudentModal" tabindex="-1" aria-labelledby="editStudentModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form id="editStudentForm" method="POST" action="/ewgs/admin/student/edit">
+                <form id="editStudentForm" method="POST" action="<?= BASE ?>/admin/student/edit">
                     <input type="hidden" name="student_id" id="editStudentId">
                     <div class="modal-header">
                         <h5 class="modal-title" id="editStudentModalLabel">Edit Student</h5>
@@ -243,7 +243,7 @@
     <div class="modal fade" id="deleteStudentModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content">
-                <form id="deleteStudentForm" method="POST" action="/ewgs/admin/student/delete">
+                <form id="deleteStudentForm" method="POST" action="<?= BASE ?>/admin/student/delete">
                     <input type="hidden" name="student_id" id="deleteStudentId">
                     <div class="modal-header">
                         <h5 class="modal-title">Confirm Deletion</h5>
@@ -265,7 +265,7 @@
         </div>
     </div>
 
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <?php require_once 'views/templates/admin/datatable.php'; ?>
     <script>
         function ajaxForm(formId, modalId, onSuccess, validateFn) {
@@ -300,7 +300,8 @@
         }
 
         $(document).ready(function () {
-            var pendingDeleteRow = null;
+            var pendingDeleteRow  = null;
+            var origStudentSnap   = '';
 
             $('.flash-toast').each(function () {
                 bootstrap.Toast.getOrCreateInstance(this, { delay: 5000 }).show();
@@ -312,13 +313,18 @@
             });
 
             var table = $('#studentTable').DataTable({
+                serverSide: true,
+                processing: true,
+                searchDelay: 500,
+                order: [],
                 ajax: {
-                    url: '/ewgs/admin/student/data',
+                    url: '<?= BASE ?>/admin/student/data',
                     type: 'GET',
                     dataSrc: 'data'
                 },
                 columns: [
-                    { data: 'count',         width: '5%' },
+                    { data: null, orderable: false, searchable: false, width: '5%',
+                      render: function(data, type, row, meta) { return meta.row + meta.settings._iDisplayStart + 1; } },
                     { data: 'student_fname' },
                     { data: 'student_lname' },
                     { data: 'lrn' },
@@ -359,6 +365,16 @@
                 ],
                 language: { emptyTable: 'No students found.' }
             });
+            // Auto-refresh every 15s; fires immediately on tab focus if a refresh was missed
+            (function () {
+                var missed = false;
+                setInterval(function () {
+                    if (document.hidden) { missed = true; } else { table.ajax.reload(null, false); }
+                }, 15000);
+                document.addEventListener('visibilitychange', function () {
+                    if (!document.hidden && missed) { missed = false; table.ajax.reload(null, false); }
+                });
+            })();
 
             // ── Open Edit modal ──────────────────────────────────────
             $('#studentTable').on('click', '.btn-edit-student', function () {
@@ -368,6 +384,7 @@
                 $('#editStudentLrn').val($(this).data('lrn'));
                 $('#editStudentGender').val($(this).data('gender'));
                 $('#editStudentBirthDate').val($(this).data('bdate') || '');
+                origStudentSnap = $('#editStudentForm').serialize();
                 new bootstrap.Modal(document.getElementById('editStudentModal')).show();
             });
 
@@ -392,17 +409,21 @@
             // ── AJAX form handlers ───────────────────────────────────
             ajaxForm('#addStudentForm',  'addStudentModal',  function () { table.ajax.reload(null, false); }, function () {
                 return validateForm([
-                    { el: $('#student_fname'), label: 'First Name', required: true, minLen: 2 },
-                    { el: $('#student_lname'), label: 'Last Name',  required: true, minLen: 2 },
+                    { el: $('#student_fname'), label: 'First Name', required: true, minLen: 2, noDigits: true },
+                    { el: $('#student_lname'), label: 'Last Name',  required: true, minLen: 2, noDigits: true },
                     { el: $('#lrn'),           label: 'LRN',        required: true, digits: true, exactLen: 12 },
                     { el: $('#gender'),        label: 'Gender',     required: true },
                     { el: $('#birth_date'),    label: 'Birth Date', required: true }
                 ]);
             });
             ajaxForm('#editStudentForm', 'editStudentModal', function () { table.ajax.reload(null, false); }, function () {
+                if ($('#editStudentForm').serialize() === origStudentSnap) {
+                    showToast('warning', 'No changes were made.');
+                    return false;
+                }
                 return validateForm([
-                    { el: $('#editStudentFname'),     label: 'First Name', required: true, minLen: 2 },
-                    { el: $('#editStudentLname'),     label: 'Last Name',  required: true, minLen: 2 },
+                    { el: $('#editStudentFname'),     label: 'First Name', required: true, minLen: 2, noDigits: true },
+                    { el: $('#editStudentLname'),     label: 'Last Name',  required: true, minLen: 2, noDigits: true },
                     { el: $('#editStudentLrn'),       label: 'LRN',        required: true, digits: true, exactLen: 12 },
                     { el: $('#editStudentGender'),    label: 'Gender',     required: true },
                     { el: $('#editStudentBirthDate'), label: 'Birth Date', required: true }
@@ -458,6 +479,85 @@
 
             $('#importStudentModal').on('hidden.bs.modal', function () {
                 document.getElementById('importStudentForm').reset();
+            });
+
+            // Live name validation
+            function liveNameCheck($el, label) {
+                var val = $el.val().trim();
+                var $btn = $el.closest('form').find('[type=submit]');
+                if (val === '') {
+                    $el.next('.name-invalid-feedback').remove();
+                    $el.removeClass('is-valid is-invalid');
+                    $btn.prop('disabled', false);
+                } else if (/[^a-zA-ZÀ-ÿ\s'\-]/.test(val)) {
+                    setTimeout(function () {
+                        var v = $el.val().trim();
+                        $el.next('.name-invalid-feedback').remove();
+                        if (/[^a-zA-ZÀ-ÿ\s'\-]/.test(v)) {
+                            $el.removeClass('is-valid').addClass('is-invalid')
+                               .after('<div class="name-invalid-feedback invalid-feedback">' + label + ' must only contain letters.</div>');
+                            $btn.prop('disabled', true);
+                        } else {
+                            $el.removeClass('is-invalid').addClass('is-valid');
+                            $btn.prop('disabled', false);
+                        }
+                    }, 0);
+                } else {
+                    $el.next('.name-invalid-feedback').remove();
+                    $el.removeClass('is-invalid').addClass('is-valid');
+                    $btn.prop('disabled', false);
+                }
+            }
+
+            $('#student_fname, #student_lname, #editStudentFname, #editStudentLname').on('input change blur', function () {
+                liveNameCheck($(this), $(this).is('#student_fname, #editStudentFname') ? 'First Name' : 'Last Name');
+            });
+
+            // ── LRN uniqueness check ─────────────────────────────────
+            function lrnFeedback($input, available) {
+                var $fb = $input.siblings('.lrn-feedback');
+                if (!$fb.length) $fb = $('<small class="lrn-feedback d-block mt-1"></small>').insertAfter($input);
+                var $btn = $input.closest('form').find('[type=submit]');
+                if (available === null) {
+                    $fb.text('').removeClass('text-success text-danger');
+                    $btn.prop('disabled', false);
+                } else if (available) {
+                    $fb.text('✓ LRN is available').removeClass('text-danger').addClass('text-success');
+                    $btn.prop('disabled', false);
+                } else {
+                    $fb.text('✗ LRN already exists').removeClass('text-success').addClass('text-danger');
+                    $btn.prop('disabled', true);
+                }
+            }
+
+            function checkLrn($input, excludeId) {
+                var lrn = $input.val().trim();
+                if (!/^\d{12}$/.test(lrn)) { lrnFeedback($input, null); return; }
+                var params = { lrn: lrn };
+                if (excludeId) params.exclude_id = excludeId;
+                $.getJSON('<?= BASE ?>/admin/student/check-lrn', params, function (res) {
+                    lrnFeedback($input, res.available);
+                });
+            }
+
+            var lrnTimer;
+            $('#lrn').on('input', function () {
+                clearTimeout(lrnTimer);
+                var $el = $(this);
+                lrnTimer = setTimeout(function () { checkLrn($el, null); }, 300);
+            });
+            $('#editStudentLrn').on('input', function () {
+                clearTimeout(lrnTimer);
+                var $el = $(this);
+                lrnTimer = setTimeout(function () { checkLrn($el, $('#editStudentId').val()); }, 300);
+            });
+
+            // Reset feedback & re-enable submit when modals close
+            $('#addStudentModal').on('hidden.bs.modal', function () {
+                lrnFeedback($('#lrn'), null);
+            });
+            $('#editStudentModal').on('hidden.bs.modal', function () {
+                lrnFeedback($('#editStudentLrn'), null);
             });
         });
     </script>

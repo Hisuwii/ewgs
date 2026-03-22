@@ -10,7 +10,7 @@ class AdminAuthController
 
         // Already logged in → go to dashboard
         if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
-            header('Location: /ewgs/admin/AdminDashboard');
+            header('Location: ' . BASE . '/admin/AdminDashboard');
             exit;
         }
 
@@ -60,7 +60,7 @@ class AdminAuthController
 
         setFlash('success', 'Welcome back, ' . $admin['username'] . '!');
 
-        header('Location: /ewgs/admin/AdminDashboard');
+        header('Location: ' . BASE . '/admin/AdminDashboard');
         exit;
     }
 
@@ -70,7 +70,7 @@ class AdminAuthController
         header('Pragma: no-cache');
 
         if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
-            header('Location: /ewgs/admin/AdminDashboard');
+            header('Location: ' . BASE . '/admin/AdminDashboard');
             exit;
         }
 
@@ -116,7 +116,7 @@ class AdminAuthController
         AdminModel::addAdmin($username, password_hash($password, PASSWORD_DEFAULT));
 
         setFlash('success', 'Account created! You can now log in.');
-        header('Location: /ewgs/admin');
+        header('Location: ' . BASE . '/admin');
         exit;
     }
 
@@ -126,7 +126,7 @@ class AdminAuthController
         session_destroy();
         header('Cache-Control: no-store, no-cache, must-revalidate');
         header('Pragma: no-cache');
-        header('Location: /ewgs/admin');
+        header('Location: ' . BASE . '/admin');
         exit;
     }
 }

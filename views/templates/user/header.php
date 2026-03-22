@@ -3,19 +3,20 @@
 <meta http-equiv="Pragma" content="no-cache">
 
 <!-- Common CSS Resources -->
-<link href="/ewgs/public/css/bootstrap.css" rel="stylesheet">
-<script src="/ewgs/public/js/jquery.min.js"></script>
+<link href="<?= BASE ?>/public/css/bootstrap.css" rel="stylesheet">
+<script src="<?= BASE ?>/public/js/jquery.min.js"></script>
+<script src="<?= BASE ?>/public/js/app.js"></script>
 
 <!-- bfcache fix: hide page instantly and redirect to login when restored from back/forward cache -->
 <script>
     $(window).on('pageshow', function (event) {
         if (event.originalEvent.persisted) {
             $('body').hide();
-            window.location.replace('/ewgs/?expired=1');
+            window.location.replace('<?= BASE ?>/?expired=1');
         }
     });
 </script>
-<link href="/ewgs/public/css/bootstrap-icons.min.css" rel="stylesheet">
+<link href="<?= BASE ?>/public/css/bootstrap-icons.min.css" rel="stylesheet">
 
 <style>
     body {
@@ -123,12 +124,85 @@
         border: none;
         background: none;
     }
+    .sidebar-footer .dropdown-toggle {
+        width: 34px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: background 0.18s;
+        padding: 0;
+    }
+    .sidebar-footer .dropdown-toggle:hover,
+    .sidebar-footer .dropdown-toggle:focus {
+        background: rgba(255,255,255,0.18);
+        outline: none;
+        box-shadow: none;
+    }
     .sidebar-footer .dropdown-toggle i {
         color: #fff;
-        font-size: 1.2rem;
+        font-size: 1.15rem;
     }
     .no-caret::after {
         display: none !important;
+    }
+
+    /* Sidebar footer dropdown menu */
+    .sidebar-footer .dropdown-menu {
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+        padding: 6px;
+        min-width: 190px;
+        z-index: 2000;
+    }
+    .sidebar-footer .dropdown-item {
+        border-radius: 7px;
+        padding: 9px 14px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #374151;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        transition: background 0.15s;
+    }
+    .sidebar-footer .dropdown-item:hover {
+        background-color: #e8f5e9;
+        color: #1b5e20;
+    }
+    .sidebar-footer .dropdown-item i {
+        font-size: 15px;
+        width: 16px;
+        text-align: center;
+        flex-shrink: 0;
+    }
+    .sidebar-footer .dropdown-divider {
+        margin: 4px 6px;
+        border-color: #e5e7eb;
+    }
+    /* Dark mode dropdown */
+    body.dark-mode .sidebar-footer .dropdown-menu {
+        background: #2d2d2d;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    }
+    body.dark-mode .sidebar-footer .dropdown-item {
+        color: #e0e0e0;
+    }
+    body.dark-mode .sidebar-footer .dropdown-item:hover {
+        background-color: #3a3a3a;
+        color: #fff;
+    }
+    body.dark-mode .sidebar-footer .dropdown-divider {
+        border-color: #444;
+    }
+    body.dark-mode .sidebar-footer .dropdown-item.text-danger {
+        color: #f87171 !important;
+    }
+    body.dark-mode .sidebar-footer .dropdown-item.text-danger:hover {
+        background-color: #3b1a1a;
+        color: #fca5a5 !important;
     }
 
     /* Main Content */

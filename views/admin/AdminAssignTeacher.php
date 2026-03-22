@@ -7,7 +7,7 @@
     <?php require_once 'views/templates/admin/header.php'; ?>
     <?php require_once 'views/templates/admin/modal.php'; ?>
     <?php require_once 'views/templates/admin/datatable.php'; ?>
-    <link rel="stylesheet" href="/ewgs/public/css/tom-select.bootstrap5.min.css">
+    <link rel="stylesheet" href="<?= BASE ?>/public/css/tom-select.bootstrap5.min.css">
     <style>
         .ts-wrapper .ts-control { border-color: #d0d8d0 !important; border-radius: 6px !important; min-height: 38px; font-size: 14px; }
         .ts-wrapper.focus .ts-control { border-color: #4b6b4b !important; box-shadow: 0 0 0 2px rgba(75,107,75,0.15) !important; }
@@ -103,17 +103,22 @@
     </div>
 </div>
 
-<script src="/ewgs/public/js/bootstrap.bundle.js"></script>
-<script src="/ewgs/public/js/tom-select.complete.min.js"></script>
+<script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
+<script src="<?= BASE ?>/public/js/tom-select.complete.min.js"></script>
 <script>
 $(function () {
     var tsTeacher = new TomSelect('#selTeacher', { allowEmptyOption: true });
     var tsClass   = new TomSelect('#selClass',   { allowEmptyOption: true });
 
     var table = $('#linksTable').DataTable({
-        ajax: { url: '/ewgs/admin/assign/teacher/data', type: 'GET', dataSrc: 'data' },
+        serverSide: true,
+        processing: true,
+        searchDelay: 500,
+        order: [],
+        ajax: { url: '<?= BASE ?>/admin/assign/teacher/data', type: 'GET', dataSrc: 'data' },
         columns: [
-            { data: 'count' },
+            { data: null, orderable: false, searchable: false,
+              render: function(data, type, row, meta) { return meta.row + meta.settings._iDisplayStart + 1; } },
             { data: 'teacher_name' },
             { data: 'class_name' },
             { data: 'grade_level' },
@@ -141,7 +146,7 @@ $(function () {
             return;
         }
         var $btn = $(this).prop('disabled', true);
-        $.post('/ewgs/admin/assign/teacher/link', { teacher_id: teacherId, class_id: classId }, function (res) {
+        $.post('<?= BASE ?>/admin/assign/teacher/link', { teacher_id: teacherId, class_id: classId }, function (res) {
             if (res.success) {
                 showToast('success', 'Teacher linked to class successfully.');
                 table.ajax.reload(null, false);
@@ -167,7 +172,7 @@ $(function () {
     $('#btnConfirmUnlink').on('click', function () {
         if (!pendingClassId) return;
         bootstrap.Modal.getOrCreateInstance($('#unlinkModal')[0]).hide();
-        $.post('/ewgs/admin/assign/teacher/unlink', { class_id: pendingClassId }, function (res) {
+        $.post('<?= BASE ?>/admin/assign/teacher/unlink', { class_id: pendingClassId }, function (res) {
             if (res.success) {
                 showToast('success', 'Teacher unlinked from class.');
                 table.ajax.reload(null, false);

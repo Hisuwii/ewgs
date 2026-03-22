@@ -43,20 +43,35 @@
         #gradeTable thead tr:last-child  th { background: #4b6b4b; color: #fff; font-size: 12px; }
         body.dark-mode #gradeTable thead tr:first-child th { background: #1a3a1a; }
         body.dark-mode #gradeTable thead tr:last-child  th { background: #2e4e2e; }
-        #gradeTable tbody td { vertical-align: middle; }
+        #gradeTable tbody td { vertical-align: middle; color: #000; }
 
         .score-input {
             width: 72px; text-align: center; font-size: 13px;
             background: transparent !important; padding: 4px 6px;
+            color: #000;
         }
-        body.dark-mode .score-input { color: #f3f4f6 !important; }
+        .score-input::placeholder { color: #aaa; }
         .score-input.is-invalid { border-color: #dc3545 !important; }
 
-        .comp-pct-cell { font-weight: 600; font-size: .95rem; color: #555; min-width: 70px; }
-        body.dark-mode .comp-pct-cell { color: #bbb; }
+        .comp-pct-cell { font-weight: 600; font-size: .95rem; color: #000; min-width: 70px; }
+
+        /* Dark mode — grade table */
+        body.dark-mode #gradeTable tbody tr:nth-child(odd)  { background-color: #1e1e1e; }
+        body.dark-mode #gradeTable tbody tr:nth-child(even) { background-color: #252525; }
+        body.dark-mode #gradeTable tbody td {
+            color: #e0e0e0;
+            border-color: #333 !important;
+        }
+        body.dark-mode #gradeTable tbody tr:hover td { background-color: #2e3e2e !important; }
+        body.dark-mode .score-input {
+            color: #e0e0e0 !important;
+            border-color: #555 !important;
+        }
+        body.dark-mode .score-input::placeholder { color: #666 !important; }
+        body.dark-mode .comp-pct-cell { color: #aaa; }
         .grade-display { font-weight: 700; font-size: 1.05rem; }
-        .grade-passed  { color: #28a745; }
-        .grade-failed  { color: #dc3545; }
+        #gradeTable tbody td.grade-passed { color: #28a745; }
+        #gradeTable tbody td.grade-failed { color: #dc3545; }
 
         /* ── Component header groups ─────────────────────── */
         th.comp-header { text-align: center; border-right: 2px solid rgba(255,255,255,.3); }
@@ -201,12 +216,12 @@
         </div>
     </div>
 
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <script>
     $(document).ready(function () {
 
         var CLASS_ID        = <?= (int) $class['class_id'] ?>;
-        var CANCEL_URL      = '<?= isset($pageMode) && $pageMode === 'manage' ? '/ewgs/user/manage-grades' : '/ewgs/user/add-grade' ?>';
+        var CANCEL_URL      = '<?= isset($pageMode) && $pageMode === 'manage' ? BASE . '/user/manage-grades' : BASE . '/user/add-grade' ?>';
         var isDirty         = false;
         var pendingUrl      = null;
         var pendingAction   = null;
@@ -248,8 +263,8 @@
         function loadGradeTable() {
             showLoading();
             $.when(
-                $.getJSON('/ewgs/user/grade/structure/' + getSubject()),
-                $.getJSON('/ewgs/user/grade/existing', { class_id: CLASS_ID, subject_id: getSubject(), quarter: getQuarter() })
+                $.getJSON('<?= BASE ?>/user/grade/structure/' + getSubject()),
+                $.getJSON('<?= BASE ?>/user/grade/existing', { class_id: CLASS_ID, subject_id: getSubject(), quarter: getQuarter() })
             ).done(function (sResult, eResult) {
                 currentStructure = sResult[0];
                 var existingScores = eResult[0];
@@ -259,7 +274,7 @@
                 showTable();
             }).fail(function () {
                 showPrompt();
-                alert('Failed to load grade data. Please try again.');
+                showToast('error', 'Failed to load grade data. Please try again.');
             });
         }
 
@@ -393,10 +408,12 @@
             $('#gradeTableBody tr[data-student-id]').each(function () {
                 var sid = $(this).data('student-id');
                 $(this).find('.score-input').each(function () {
+                    var val = $(this).val();
+                    if (val === '') return; // skip blank — not yet graded
                     scores.push({
                         student_id:  sid,
                         activity_id: $(this).data('activity-id'),
-                        score:       $(this).val() || 0
+                        score:       parseFloat(val)
                     });
                 });
             });
@@ -405,7 +422,7 @@
             $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving…');
 
             $.ajax({
-                url:      '/ewgs/user/grade/save',
+                url:      '<?= BASE ?>/user/grade/save',
                 type:     'POST',
                 data:     { class_id: CLASS_ID, subject_id: getSubject(), quarter: getQuarter(), scores: scores },
                 dataType: 'json',
@@ -413,16 +430,13 @@
                     $btn.html('<i class="bi bi-check-circle"></i> Save').prop('disabled', false);
                     if (res.success) {
                         isDirty = false;
-                        var toast = $('<div class="toast-notification toast-success" style="display:flex;">' +
-                            '<i class="bi bi-check-circle-fill"></i><span>' + res.message + '</span></div>');
-                        $('body').append(toast);
-                        toast.fadeIn().delay(3000).fadeOut(function () { toast.remove(); });
+                        showToast('success', res.message);
                     } else {
-                        alert(res.message || 'An error occurred.');
+                        showToast('error', res.message || 'An error occurred.');
                     }
                 },
                 error: function () {
-                    alert('An unexpected error occurred. Please try again.');
+                    showToast('error', 'An unexpected error occurred. Please try again.');
                     $btn.html('<i class="bi bi-check-circle"></i> Save').prop('disabled', false);
                 }
             });

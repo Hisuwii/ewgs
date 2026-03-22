@@ -6,7 +6,7 @@
     <title>Subjects | EWGS</title>
     <?php require_once 'views/templates/admin/header.php'; ?>
     <?php require_once 'views/templates/admin/modal.php'; ?>
-    <link rel="stylesheet" href="/ewgs/public/css/tom-select.bootstrap5.min.css">
+    <link rel="stylesheet" href="<?= BASE ?>/public/css/tom-select.bootstrap5.min.css">
     <style>
         #addSubject {
             background-color: #4b6b4b !important;
@@ -55,17 +55,34 @@
         /* Dark mode fixes for modal inputs */
         body.dark-mode .config-table input,
         body.dark-mode .scores-table input {
-            background: #2a2a2a;
-            color: #e0e0e0;
+            background: #2a2a2a !important;
+            color: #e0e0e0 !important;
+            border-color: #444 !important;
+        }
+        body.dark-mode .config-table input::placeholder,
+        body.dark-mode .scores-table input::placeholder {
+            color: #666 !important;
+        }
+        body.dark-mode .config-table input:focus,
+        body.dark-mode .scores-table input:focus {
+            background: #333 !important;
+            box-shadow: inset 0 0 0 2px #4b6b4b !important;
         }
         body.dark-mode .config-table .component-name,
         body.dark-mode .scores-table .row-label {
-            background: #1e1e1e;
+            background: #1e1e1e !important;
             color: #e0e0e0;
         }
+        body.dark-mode .config-table tbody tr:not(.total-row) td {
+            background: #2a2a2a;
+        }
         body.dark-mode .config-table .total-row td {
-            background: #1a2a1a;
+            background: #1a2a1a !important;
             color: #e0e0e0;
+        }
+        body.dark-mode .scores-table td.bg-light,
+        body.dark-mode .scores-table td:not(.row-label) {
+            background: #2a2a2a !important;
         }
         /* Component config table */
         .config-table th {
@@ -189,7 +206,7 @@
     <div class="modal fade" id="addSubjectModal" tabindex="-1" aria-labelledby="addSubjectModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
-                <form id="addSubjectForm" method="POST" action="/ewgs/admin/subject/add">
+                <form id="addSubjectForm" method="POST" action="<?= BASE ?>/admin/subject/add">
                     <div class="modal-header">
                         <h5 class="modal-title" id="addSubjectModalLabel">Add New Subject</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -300,23 +317,89 @@
 
     <!-- Edit Subject Modal -->
     <div class="modal fade" id="editSubjectModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
-                <form id="editSubjectForm" method="POST" action="/ewgs/admin/subject/edit">
+                <form id="editSubjectForm" method="POST" action="<?= BASE ?>/admin/subject/edit">
                     <input type="hidden" name="subject_id" id="editSubjectId">
                     <div class="modal-header">
                         <h5 class="modal-title">Edit Subject</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Subject Name</label>
-                            <input type="text" class="form-control" id="editSubjectName" name="subject_name" required>
+
+                        <div id="editSubjectLoader" class="text-center py-4">
+                            <div class="spinner-border text-success" role="status"></div>
                         </div>
+
+                        <div id="editSubjectBody" style="display:none;">
+                            <!-- Subject Name -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Subject Name</label>
+                                <input type="text" class="form-control" id="editSubjectName" name="subject_name" required>
+                            </div>
+
+                            <!-- Assign to Class -->
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Assign to Class</label>
+                                <select class="form-select" id="editClassId" name="class_id">
+                                    <option value="">-- No Class Assigned --</option>
+                                    <?php foreach ($classes as $class): ?>
+                                        <option value="<?= $class['class_id'] ?>">
+                                            <?= htmlspecialchars($class['class_name'] . ' (' . $class['grade_level'] . ')') ?>
+                                            <?= $class['teacher_name'] ? ' — ' . htmlspecialchars($class['teacher_name']) : '' ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <!-- Component Configuration -->
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Component Configuration</label>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered config-table mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th style="width:40%;">Component</th>
+                                                <th class="text-center" style="width:30%;">Percentage (%)</th>
+                                                <th class="text-center" style="width:30%;">No. of Activities</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td class="component-name">Written Work</td>
+                                                <td><input type="number" class="form-control edit-percentage-input" name="written_percentage" id="editWrittenPct" min="0" max="100" step="0.01" required></td>
+                                                <td><input type="number" class="form-control edit-activity-count" name="written_count" id="editWrittenCount" min="1" max="20" required></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="component-name">Performance Task</td>
+                                                <td><input type="number" class="form-control edit-percentage-input" name="performance_percentage" id="editPerformancePct" min="0" max="100" step="0.01" required></td>
+                                                <td><input type="number" class="form-control edit-activity-count" name="performance_count" id="editPerformanceCount" min="1" max="20" required></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="component-name">Quarterly Exam</td>
+                                                <td><input type="number" class="form-control edit-percentage-input" name="quarterly_percentage" id="editQuarterlyPct" min="0" max="100" step="0.01" required></td>
+                                                <td><input type="number" class="form-control edit-activity-count" name="quarterly_count" id="editQuarterlyCount" min="1" max="5" required></td>
+                                            </tr>
+                                            <tr class="total-row">
+                                                <td class="fw-bold text-end">Total:</td>
+                                                <td class="text-center fw-bold">
+                                                    <span id="editPercentageTotal" class="percentage-invalid">0.0% <i class="bi bi-exclamation-circle-fill"></i></span>
+                                                </td>
+                                                <td class="text-center text-muted"><span id="editActivityTotal">3</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Activity Perfect Scores -->
+                            <div id="editActivityScoresContainer"></div>
+                        </div>
+
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-save">Save Changes</button>
+                        <button type="submit" class="btn btn-save" id="editSubjectSaveBtn">Save Changes</button>
                     </div>
                 </form>
             </div>
@@ -327,7 +410,7 @@
     <div class="modal fade" id="deleteSubjectModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <form id="deleteSubjectForm" method="POST" action="/ewgs/admin/subject/delete">
+                <form id="deleteSubjectForm" method="POST" action="<?= BASE ?>/admin/subject/delete">
                     <input type="hidden" name="subject_id" id="deleteSubjectId">
                     <div class="modal-header">
                         <h5 class="modal-title">Delete Subject</h5>
@@ -345,23 +428,92 @@
         </div>
     </div>
 
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <?php require_once 'views/templates/admin/datatable.php'; ?>
-    <script src="/ewgs/public/js/tom-select.complete.min.js"></script>
+    <script src="<?= BASE ?>/public/js/tom-select.complete.min.js"></script>
     <script>
         $(document).ready(function () {
             var pendingDeleteRow = null;
-            var tsClass = new TomSelect('#class_id', { allowEmptyOption: true });
+            var origSubjectSnap  = '';
+
+            /* ── Subject name duplicate check ──────────────────── */
+            function checkSubjectDuplicate(nameEl, excludeId, callback) {
+                var name = $(nameEl).val().trim();
+                if (!name) { callback(false); return; }
+                $.get('<?= BASE ?>/admin/subject/check', {
+                    subject_name: name, exclude_id: excludeId || ''
+                }, function (res) { callback(res.exists); });
+            }
+            function showSubjectDupError(nameEl) {
+                $(nameEl).addClass('is-invalid').next('.dup-feedback').remove();
+                $(nameEl).after('<div class="dup-feedback invalid-feedback d-block">A subject with this name already exists.</div>');
+            }
+            function clearSubjectDupError(nameEl) {
+                var $el = $(nameEl);
+                $el.next('.dup-feedback').remove();
+                if (!$el.next('.name-invalid-feedback').length) {
+                    $el.removeClass('is-invalid');
+                }
+            }
+
+            function liveSubjectCheck($el) {
+                var val = $el.val().trim();
+                var $btn = $el.closest('form').find('[type=submit]');
+                if (val === '') {
+                    $el.next('.name-invalid-feedback').remove();
+                    $el.removeClass('is-valid is-invalid');
+                    $btn.prop('disabled', false);
+                } else if (/[^a-zA-ZÀ-ÿ\s'\-]/.test(val)) {
+                    setTimeout(function () {
+                        var v = $el.val().trim();
+                        $el.next('.name-invalid-feedback').remove();
+                        if (/[^a-zA-ZÀ-ÿ\s'\-]/.test(v)) {
+                            $el.removeClass('is-valid').addClass('is-invalid')
+                               .after('<div class="name-invalid-feedback invalid-feedback">Subject Name must only contain letters.</div>');
+                            $btn.prop('disabled', true);
+                        } else {
+                            $el.removeClass('is-invalid').addClass('is-valid');
+                            $btn.prop('disabled', false);
+                        }
+                    }, 0);
+                } else {
+                    $el.next('.name-invalid-feedback').remove();
+                    $el.removeClass('is-invalid').addClass('is-valid');
+                    $btn.prop('disabled', false);
+                }
+            }
+            $('#subject_name, #editSubjectName').on('input change blur', function () {
+                liveSubjectCheck($(this));
+            });
+
+            $('#subject_name').on('blur', function () {
+                checkSubjectDuplicate('#subject_name', null, function (exists) {
+                    exists ? showSubjectDupError('#subject_name') : clearSubjectDupError('#subject_name');
+                });
+            });
+            $('#editSubjectName').on('blur', function () {
+                var excludeId = $('#editSubjectId').val();
+                checkSubjectDuplicate('#editSubjectName', excludeId, function (exists) {
+                    exists ? showSubjectDupError('#editSubjectName') : clearSubjectDupError('#editSubjectName');
+                });
+            });
+            var tsClass     = new TomSelect('#class_id',     { allowEmptyOption: true });
+            var tsEditClass = new TomSelect('#editClassId', { allowEmptyOption: true });
 
             /* ── DataTable ─────────────────────────────────────── */
             var table = $('#subjectTable').DataTable({
+                serverSide: true,
+                processing: true,
+                order: [],
+                searchDelay: 500,
                 ajax: {
-                    url: '/ewgs/admin/subject/data',
+                    url: '<?= BASE ?>/admin/subject/data',
                     type: 'GET',
                     dataSrc: 'data'
                 },
                 columns: [
-                    { data: 'count', width: '5%' },
+                    { data: null, orderable: false, searchable: false, width: '5%',
+                      render: function(data, type, row, meta) { return meta.row + meta.settings._iDisplayStart + 1; } },
                     { data: 'subject_name' },
                     {
                         data: 'class_name',
@@ -396,6 +548,16 @@
                 ],
                 language: { emptyTable: 'No subjects found.' }
             });
+            // Auto-refresh every 15s; fires immediately on tab focus if a refresh was missed
+            (function () {
+                var missed = false;
+                setInterval(function () {
+                    if (document.hidden) { missed = true; } else { table.ajax.reload(null, false); }
+                }, 15000);
+                document.addEventListener('visibilitychange', function () {
+                    if (!document.hidden && missed) { missed = false; table.ajax.reload(null, false); }
+                });
+            })();
 
             /* ── Delete modal ──────────────────────────────────── */
             $('#subjectTable').on('click', '.btn-delete-subject', function () {
@@ -425,29 +587,138 @@
             });
 
             /* ── Edit modal ────────────────────────────────────── */
+            function updateEditPercentageTotal() {
+                var ww = parseFloat($('#editWrittenPct').val())     || 0;
+                var pt = parseFloat($('#editPerformancePct').val()) || 0;
+                var qa = parseFloat($('#editQuarterlyPct').val())   || 0;
+                var total = ww + pt + qa;
+                var $el = $('#editPercentageTotal');
+                if (Math.abs(total - 100) < 0.01) {
+                    $el.removeClass('percentage-invalid').addClass('percentage-valid')
+                       .html(total.toFixed(1) + '% <i class="bi bi-check-circle-fill"></i>');
+                } else {
+                    $el.removeClass('percentage-valid').addClass('percentage-invalid')
+                       .html(total.toFixed(1) + '% <i class="bi bi-exclamation-circle-fill"></i>');
+                }
+            }
+
+            function updateEditActivityTotal() {
+                var ww = parseInt($('#editWrittenCount').val())     || 0;
+                var pt = parseInt($('#editPerformanceCount').val()) || 0;
+                var qa = parseInt($('#editQuarterlyCount').val())   || 0;
+                $('#editActivityTotal').text(ww + pt + qa);
+            }
+
+            function generateEditActivityInputs(prefill) {
+                // prefill: { 'Written Work': [score, ...], 'Performance Task': [...], 'Quarterly Exam': [...] }
+                prefill = prefill || {};
+                var ww = parseInt($('#editWrittenCount').val())     || 0;
+                var pt = parseInt($('#editPerformanceCount').val()) || 0;
+                var qa = parseInt($('#editQuarterlyCount').val())   || 0;
+                updateEditActivityTotal();
+
+                var $container = $('#editActivityScoresContainer');
+                $container.empty();
+                if (ww <= 0 && pt <= 0 && qa <= 0) return;
+
+                var maxCount = Math.max(ww, pt, qa);
+                var html = '<label class="form-label fw-semibold mt-2 mb-2">Perfect Scores per Activity</label>';
+                html += '<div class="table-responsive"><table class="table table-bordered scores-table mb-0"><thead><tr>';
+                html += '<th style="width:150px;">Component</th>';
+                for (var i = 1; i <= maxCount; i++) html += '<th>Activity ' + i + '</th>';
+                html += '</tr></thead><tbody>';
+
+                var comps = [
+                    { label: 'Written Work',     count: ww, name: 'written_activity_score',     scores: prefill['Written Work']     || [] },
+                    { label: 'Performance Task', count: pt, name: 'performance_activity_score', scores: prefill['Performance Task'] || [] },
+                    { label: 'Quarterly Exam',   count: qa, name: 'quarterly_activity_score',   scores: prefill['Quarterly Exam']   || [] },
+                ];
+                $.each(comps, function (_, comp) {
+                    if (comp.count <= 0) return;
+                    html += '<tr><td class="row-label">' + comp.label + '</td>';
+                    for (var i = 1; i <= maxCount; i++) {
+                        if (i <= comp.count) {
+                            var existing = comp.scores[i - 1] || '';
+                            html += '<td><input type="number" name="' + comp.name + '[]" placeholder="Score" min="1" step="0.01" value="' + existing + '" required></td>';
+                        } else {
+                            html += '<td class="bg-light"></td>';
+                        }
+                    }
+                    html += '</tr>';
+                });
+                html += '</tbody></table></div>';
+                $container.html(html);
+            }
+
             $('#subjectTable').on('click', '.btn-edit-subject', function () {
-                $('#editSubjectId').val($(this).data('id'));
-                $('#editSubjectName').val($(this).data('name'));
+                var subjectId = $(this).data('id');
+                $('#editSubjectId').val(subjectId);
+                $('#editSubjectBody').hide();
+                $('#editSubjectLoader').show();
+                $('#editSubjectSaveBtn').prop('disabled', true);
                 bootstrap.Modal.getOrCreateInstance(document.getElementById('editSubjectModal')).show();
+
+                $.getJSON('<?= BASE ?>/admin/subject/edit-data?subject_id=' + subjectId, function (data) {
+                    $('#editSubjectName').val(data.subject_name);
+                    tsEditClass.setValue(data.current_class_id || '');
+
+                    var prefill = {};
+                    $.each(data.components, function (_, comp) {
+                        var name = comp.component_name;
+                        var countField = name === 'Written Work' ? '#editWrittenCount' :
+                                         name === 'Performance Task' ? '#editPerformanceCount' : '#editQuarterlyCount';
+                        var pctField   = name === 'Written Work' ? '#editWrittenPct' :
+                                         name === 'Performance Task' ? '#editPerformancePct' : '#editQuarterlyPct';
+                        $(countField).val(comp.activities.length);
+                        $(pctField).val(comp.percentage);
+                        prefill[name] = comp.activities.map(function (a) { return a.perfect_score; });
+                    });
+
+                    updateEditPercentageTotal();
+                    generateEditActivityInputs(prefill);
+                    origSubjectSnap = $('#editSubjectForm').serialize();
+                    $('#editSubjectLoader').hide();
+                    $('#editSubjectBody').show();
+                    $('#editSubjectSaveBtn').prop('disabled', false);
+                });
             });
 
             $('#editSubjectModal').on('hidden.bs.modal', function () {
+                tsEditClass.setValue('');
                 clearFormValidation($('#editSubjectForm'));
+                clearSubjectDupError('#editSubjectName');
+            });
+
+            $(document).on('input', '.edit-percentage-input', updateEditPercentageTotal);
+            $(document).on('input change', '.edit-activity-count', function () {
+                generateEditActivityInputs();
             });
 
             $('#editSubjectForm').on('submit', function (e) {
                 e.preventDefault();
+                if ($('#editSubjectForm').serialize() === origSubjectSnap) {
+                    showToast('warning', 'No changes were made.');
+                    return;
+                }
                 if (!validateForm([
-                    { el: $('#editSubjectName'), label: 'Subject Name', required: true, minLen: 2 }
+                    { el: $('#editSubjectName'), label: 'Subject Name', required: true, minLen: 2, noDigits: true }
                 ])) return;
+                if ($('#editSubjectName').hasClass('is-invalid') && $('#editSubjectName').next('.dup-feedback').length) return;
+                var ww = parseFloat($('#editWrittenPct').val())     || 0;
+                var pt = parseFloat($('#editPerformancePct').val()) || 0;
+                var qa = parseFloat($('#editQuarterlyPct').val())   || 0;
+                if (Math.abs(ww + pt + qa - 100) >= 0.01) {
+                    showToast('error', 'Percentages must total 100%. Current: ' + (ww + pt + qa).toFixed(1) + '%');
+                    return;
+                }
                 var $btn = $(this).find('[type=submit]').prop('disabled', true);
+                bootstrap.Modal.getInstance(document.getElementById('editSubjectModal'))?.hide();
                 $('#preloader').fadeIn(200);
                 $.ajax({
                     url: $(this).attr('action'), type: 'POST',
                     data: $(this).serialize(), dataType: 'json',
                     success: function (res) {
                         if (res.success) {
-                            bootstrap.Modal.getInstance(document.getElementById('editSubjectModal'))?.hide();
                             showToast('success', res.message);
                             table.ajax.reload(null, false);
                         } else { showToast('error', res.message); }
@@ -465,6 +736,7 @@
                 updatePercentageTotal();
                 updateActivityTotal();
                 clearFormValidation($('#addSubjectForm'));
+                clearSubjectDupError('#subject_name');
             });
 
             /* ── Percentage total ──────────────────────────────── */
@@ -549,8 +821,9 @@
             $('#addSubjectForm').on('submit', function (e) {
                 e.preventDefault();
                 if (!validateForm([
-                    { el: $('#subject_name'), label: 'Subject Name', required: true, minLen: 2 }
+                    { el: $('#subject_name'), label: 'Subject Name', required: true, minLen: 2, noDigits: true }
                 ])) return;
+                if ($('#subject_name').hasClass('is-invalid') && $('#subject_name').next('.dup-feedback').length) return;
                 var ww = parseFloat($('#written_percentage').val())     || 0;
                 var pt = parseFloat($('#performance_percentage').val()) || 0;
                 var qa = parseFloat($('#quarterly_percentage').val())   || 0;

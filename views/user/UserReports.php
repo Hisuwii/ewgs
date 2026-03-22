@@ -103,10 +103,13 @@
         body.dark-mode .form-select,
         body.dark-mode .form-control { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
         body.dark-mode .grade-table th,
-        body.dark-mode .grade-table td { border-color: #444; color: #e0e0e0; }
+        body.dark-mode .grade-table td { border-color: #444 !important; color: #e0e0e0 !important; background: #1e1e1e !important; }
+        body.dark-mode .grade-table thead.table-light th { background: #2a2a2a !important; color: #a5d6a7 !important; border-color: #444 !important; }
+        body.dark-mode .grade-table tbody tr:hover td { background: #2a2a2a !important; }
         body.dark-mode .section-label { color: #9ca3af; }
         body.dark-mode #sectionBreakdownText,
-        body.dark-mode #studentBreakdownText { color: #aaa; }
+        body.dark-mode #studentBreakdownText { color: #aaa !important; }
+
         #sectionBreakdownText div,
         #studentBreakdownText div { margin-bottom: 3px; }
         /* Select2 styling */
@@ -139,9 +142,16 @@
         body.dark-mode .select2-dropdown { background: #2d2d2d; border-color: #444; }
         body.dark-mode .select2-container--default .select2-results__option { color: #e0e0e0; }
         body.dark-mode .select2-container--default .select2-search--dropdown .select2-search__field { background: #1e1e1e; color: #e0e0e0; border-color: #444; }
+        /* Print area — hidden on screen, only shown when printing */
+        #printArea { display: none; }
+        @media print {
+            body > *:not(#printArea) { display: none !important; }
+            #printArea { display: block !important; }
+        }
     </style>
 </head>
 <body>
+    <div id="printArea"></div>
     <?php require_once 'views/templates/user/sidebar.php'; ?>
 
     <?= displayFlash() ?>
@@ -161,7 +171,8 @@
                         <select id="filterClass" class="form-select">
                             <option value="">— Select Class —</option>
                             <?php foreach ($classes as $c): ?>
-                                <option value="<?= $c['class_id'] ?>">
+                                <option value="<?= $c['class_id'] ?>"
+                                        data-school-year="<?= htmlspecialchars($c['school_year'] ?? '') ?>">
                                     <?= htmlspecialchars($c['class_name']) ?> (<?= htmlspecialchars($c['grade_level']) ?>)
                                 </option>
                             <?php endforeach; ?>
@@ -244,9 +255,14 @@
                 <div class="chart-card" id="studentCard">
                     <div class="card-title">
                         <i class="bi bi-person-lines-fill"></i> Student Performance
-                        <button id="btnExportStudent" class="btn btn-sm ms-auto" style="background:#2e4e2e;color:#fff;font-size:12px;padding:4px 12px;display:none;">
-                            <i class="bi bi-file-earmark-pdf me-1"></i>Export PDF
-                        </button>
+                        <div class="ms-auto d-flex gap-2">
+                            <button id="btnPrint" class="btn btn-sm btn-outline-secondary" style="font-size:12px;padding:4px 12px;display:none;">
+                                <i class="bi bi-printer me-1"></i>Print Card
+                            </button>
+                            <button id="btnExportStudent" class="btn btn-sm" style="background:#2e4e2e;color:#fff;font-size:12px;padding:4px 12px;display:none;">
+                                <i class="bi bi-file-earmark-pdf me-1"></i>Export PDF
+                            </button>
+                        </div>
                     </div>
                     <div class="row g-3 align-items-end mb-3">
                         <div class="col-md-5">
@@ -274,14 +290,16 @@
         </div>
     </div>
 
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <script>
     $(function () {
 
-        var sectionChartInstance = null;
-        var studentChartInstance = null;
-        var currentClassId = null;
-        var currentQuarter = null;
+        var sectionChartInstance  = null;
+        var studentChartInstance  = null;
+        var currentClassId        = null;
+        var currentQuarter        = null;
+        var currentStudentData    = null;
+        var currentStudentName    = '';
 
         // ── Chart.js dark mode defaults ────────────────────────
         function isDark() { return $('body').hasClass('dark-mode'); }
@@ -308,7 +326,7 @@
             }
             var $btn = $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Loading…');
             // Load main report first; stats call is secondary and must not block
-            $.getJSON('/ewgs/user/reports/section-data', { class_id: currentClassId, quarter: currentQuarter })
+            $.getJSON('<?= BASE ?>/user/reports/section-data', { class_id: currentClassId, quarter: currentQuarter })
                 .done(function (res) {
                     $('#emptyState').hide();
                     $('#reportContent').show();
@@ -316,7 +334,7 @@
                     renderSection(res.report, null);
                     populateStudentPicker(res.students);
                     // Enhance with enrolled count from stats (updates not-yet-graded pill + table)
-                    $.getJSON('/ewgs/user/manage-grades/stats')
+                    $.getJSON('<?= BASE ?>/user/manage-grades/stats')
                         .done(function (statsList) {
                             var classStat = null;
                             if (Array.isArray(statsList)) {
@@ -457,7 +475,7 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            ticks: { stepSize: 1, precision: 0 },
+                            ticks: { stepSize: 1, precision: 0, callback: function(v) { return Number.isInteger(v) ? v : null; } },
                             title: { display: true, text: 'Number of Students' }
                         }
                     }
@@ -468,7 +486,7 @@
         // ── Student picker ─────────────────────────────────────
         function loadStudentChart(studentId, studentName) {
             if (!studentId) { $('#studentChartArea').hide(); $('#studentEmpty').show(); return; }
-            $.getJSON('/ewgs/user/reports/student-data', {
+            $.getJSON('<?= BASE ?>/user/reports/student-data', {
                 class_id: currentClassId, student_id: studentId, quarter: currentQuarter
             }).done(function (data) {
                 renderStudentChart(data, studentName);
@@ -512,10 +530,14 @@
         // ── Student chart ──────────────────────────────────────
         function renderStudentChart(data, studentName) {
             if (!data.length) {
+                currentStudentData = null; currentStudentName = '';
+                $('#btnPrint').hide();
                 $('#studentChartArea').hide();
                 $('#studentEmpty').text('No grades found for this student.').show();
                 return;
             }
+            currentStudentData = data;
+            currentStudentName = studentName;
             $('#studentEmpty').hide();
             $('#studentChartArea').show();
 
@@ -594,6 +616,7 @@
                 calcHtml
             );
             $('#btnExportStudent').show();
+            $('#btnPrint').show();
 
             // Use first subject's weights for legend labels (most subjects share same weights)
             var wwLabel = 'Written Work % (wt: ' + (wwWts[0] || 25) + '%)';
@@ -781,6 +804,143 @@
             var breakdown = $('#studentBreakdownText').html();
             exportPDF('studentChart', title, breakdown, 'student-performance-' + student.replace(/[^a-z0-9]/gi, '_') + '.pdf');
         });
+
+        $('#btnPrint').on('click', function () {
+            if (!currentStudentData || !currentStudentData.length) {
+                showToast('warning', 'No student selected.'); return;
+            }
+            var $opt      = $('#filterClass option:selected');
+            var classInfo = {
+                class_name:  $opt.text().trim(),
+                school_year: $opt.data('school-year') || ''
+            };
+            var teacher = '<?= htmlspecialchars($_SESSION['teacher_name'] ?? '', ENT_QUOTES) ?>';
+            openSinglePrintCard(currentStudentData, currentStudentName, classInfo, teacher, currentQuarter);
+        });
+
+        function openSinglePrintCard(data, studentName, classInfo, teacher, quarter) {
+            var s = { name: studentName, lrn: data.length && data[0].lrn ? data[0].lrn : '—', gender: data.length && data[0].gender ? data[0].gender : '—', subjects: data };
+            var className  = classInfo.class_name || '';
+            var schoolYear = classInfo.school_year || '';
+            var now        = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+            openPrintWindow(buildCard(s, className, schoolYear, quarter, teacher, now));
+        }
+
+        var PRINT_CSS =
+            '@page { size: A4 portrait; margin: 12mm 14mm; }' +
+            'body { font-family: Arial, sans-serif; font-size: 11px; background:#fff; color:#000; margin:0; padding:0; }' +
+            '.index-card { width: 100%; margin: 0 0 8mm; padding: 14px 16px; border: 1.5px solid #2e4e2e; border-radius: 6px; page-break-after: always; box-sizing: border-box; }' +
+            '.index-card:last-child { page-break-after: auto; }' +
+            '.card-header-block { background: #2e4e2e; color: #fff; padding: 8px 12px; border-radius: 4px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }' +
+            '.card-header-block img { width: 38px; height: 38px; border-radius: 50%; background:#fff; padding:2px; flex-shrink:0; }' +
+            '.header-text { flex: 1; }' +
+            '.system-name { font-size: 13px; font-weight: 700; letter-spacing: .3px; color:#fff; }' +
+            '.class-meta { font-size: 10px; color: #b7d9b7; margin-top: 2px; }' +
+            '.student-info { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px 16px; margin-bottom: 10px; background: #f0fdf4; border: 1px solid #c6e8c6; border-radius: 4px; padding: 6px 10px; }' +
+            '.info-row { display: flex; gap: 5px; align-items: baseline; }' +
+            '.info-label { font-weight: 700; color: #000; white-space: nowrap; font-size: 10px; }' +
+            '.info-value { color: #000; font-size: 10.5px; }' +
+            '.grade-tbl { width: 100%; border-collapse: collapse; margin-bottom: 10px; table-layout: fixed; }' +
+            '.grade-tbl colgroup col.col-subject { width: 30%; }' +
+            '.grade-tbl colgroup col.col-score  { width: 13%; }' +
+            '.grade-tbl colgroup col.col-final  { width: 13%; }' +
+            '.grade-tbl colgroup col.col-remark { width: 11%; }' +
+            '.grade-tbl th { background: #2e4e2e; color: #fff; padding: 4px 6px; font-size: 10px; font-weight: 600; text-align: center; overflow: hidden; }' +
+            '.grade-tbl th:first-child { text-align: left; }' +
+            '.grade-tbl td { padding: 3px 6px; border-bottom: 1px solid #ddd; font-size: 10.5px; vertical-align: middle; color: #000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }' +
+            '.grade-tbl td:first-child { text-align: left; }' +
+            '.grade-tbl tbody tr:nth-child(even) td { background: #f5f5f5; }' +
+            '.grade-tbl tfoot td { background: #e8f5e9; border-top: 1.5px solid #a5d6a7; font-size: 10px; font-weight: 700; color: #000; }' +
+            '.tc { text-align: center; } .tr { text-align: right; }' +
+            '.remark-pass { background: #dcfce7; color: #14532d; padding: 1px 5px; border-radius: 3px; font-weight: 700; font-size: 9.5px; }' +
+            '.remark-fail { background: #fee2e2; color: #7f1d1d; padding: 1px 5px; border-radius: 3px; font-weight: 700; font-size: 9.5px; }' +
+            '.card-footer-block { display: flex; gap: 12px; margin-top: 10px; align-items: flex-end; }' +
+            '.sig-block { flex: 1; }' +
+            '.sig-space { height: 24px; border-bottom: 1.5px solid #000; margin-bottom: 4px; }' +
+            '.sig-label { font-size: 9px; color: #000; text-transform: uppercase; letter-spacing: .4px; text-align: center; font-weight: 600; }' +
+            '.sig-name { font-size: 10px; font-weight: 700; color: #000; text-align: center; }' +
+            '.date-block { font-size: 9px; color: #000; white-space: nowrap; align-self: flex-end; }';
+
+        function buildCard(s, className, schoolYear, quarter, teacher, now) {
+            var subRows = '', totalFinal = 0;
+            s.subjects.forEach(function (sub) {
+                var ww  = parseFloat(sub.written_work    || 0).toFixed(2);
+                var pt  = parseFloat(sub.performance_task || 0).toFixed(2);
+                var qe  = parseFloat(sub.quarterly_exam   || 0).toFixed(2);
+                var fg  = parseInt(sub.final_grade || 0);
+                totalFinal += fg;
+                var remark = fg >= 75 ? '<span class="remark-pass">Passed</span>' : '<span class="remark-fail">Failed</span>';
+                subRows += '<tr>' +
+                    '<td>' + $('<span>').text(sub.subject_name).html() + '</td>' +
+                    '<td class="tc">' + ww + '%</td>' +
+                    '<td class="tc">' + pt + '%</td>' +
+                    '<td class="tc">' + qe + '%</td>' +
+                    '<td class="tc" style="font-weight:700;">' + fg + '</td>' +
+                    '<td class="tc">' + remark + '</td>' +
+                    '</tr>';
+            });
+            var avg    = s.subjects.length ? (totalFinal / s.subjects.length).toFixed(2) : '—';
+            var passed = s.subjects.filter(function(x){ return parseInt(x.final_grade) >= 75; }).length;
+            var failed = s.subjects.length - passed;
+            var logoUrl = '<?= BASE ?>/public/images/logo.png';
+            return '<div class="index-card">' +
+                '<div class="card-header-block">' +
+                '<img src="' + logoUrl + '" alt="EWGS Logo">' +
+                '<div class="header-text">' +
+                '<div class="system-name">Elementary Web Grading System</div>' +
+                '<div class="class-meta">' + $('<span>').text(className).html() + ' &nbsp;·&nbsp; ' + quarter + ' Quarter &nbsp;·&nbsp; S.Y. ' + $('<span>').text(schoolYear).html() + '</div>' +
+                '</div>' +
+                '</div>' +
+                '<div class="student-info">' +
+                '<div class="info-row"><span class="info-label">Name:</span><span class="info-value">' + $('<span>').text(s.name).html() + '</span></div>' +
+                '<div class="info-row"><span class="info-label">LRN:</span><span class="info-value">' + $('<span>').text(s.lrn || '—').html() + '</span></div>' +
+                '<div class="info-row"><span class="info-label">Gender:</span><span class="info-value">' + $('<span>').text(s.gender || '—').html() + '</span></div>' +
+                '</div>' +
+                '<table class="grade-tbl"><colgroup>' +
+                '<col class="col-subject"><col class="col-score"><col class="col-score"><col class="col-score"><col class="col-final"><col class="col-remark">' +
+                '</colgroup><thead><tr>' +
+                '<th>Subject</th><th>Written Work</th><th>Performance Task</th><th>Quarterly Exam</th><th>Final Grade</th><th>Remarks</th>' +
+                '</tr></thead><tbody>' + subRows + '</tbody>' +
+                '<tfoot><tr><td colspan="4" class="tr">General Average &nbsp;</td><td class="tc">' + avg + '</td><td class="tc">' + (parseFloat(avg) >= 75 ? '<span class="remark-pass">Passed</span>' : '<span class="remark-fail">Failed</span>') + '</td></tr></tfoot>' +
+                '</table>' +
+                '<div class="card-footer-block">' +
+                '<div class="sig-block"><div class="sig-space"></div><div class="sig-label">Class Adviser</div><div class="sig-name">' + $('<span>').text(teacher).html() + '</div></div>' +
+                '<div class="sig-block"><div class="sig-space"></div><div class="sig-label">Parent / Guardian Signature</div></div>' +
+                '<div class="date-block">Date Printed:<br>' + now + '</div>' +
+                '</div></div>';
+        }
+
+        function openPrintWindow(cardsHtml) {
+            var $area = $('#printArea');
+            $area.html('<style>' + PRINT_CSS + '</style>' + cardsHtml);
+            window.print();
+            // Clear after print dialog closes
+            setTimeout(function () { $area.empty(); }, 1000);
+        }
+
+        function openPrintCards(res) {
+            var grades    = res.grades   || [];
+            var classInfo = res.class    || {};
+            var teacher   = res.teacher  || '';
+            var quarter   = res.quarter  || '';
+            var className = (classInfo.class_name || '') + ' (' + (classInfo.grade_level || '') + ')';
+            var schoolYear = classInfo.school_year || '';
+            var now       = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            var students = {}, order = [];
+            grades.forEach(function (g) {
+                if (!students[g.student_id]) {
+                    students[g.student_id] = { name: g.full_name, lrn: g.lrn, gender: g.gender, subjects: [] };
+                    order.push(g.student_id);
+                }
+                students[g.student_id].subjects.push(g);
+            });
+
+            if (!order.length) { showToast('warning', 'No student grades found to print.'); return; }
+            var cardsHtml = '';
+            order.forEach(function (sid) { cardsHtml += buildCard(students[sid], className, schoolYear, quarter, teacher, now); });
+            openPrintWindow(cardsHtml);
+        }
 
         // Re-render charts when dark mode toggles
         $('#mode-toggle').on('change', function () {

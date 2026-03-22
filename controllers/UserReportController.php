@@ -5,7 +5,7 @@ class UserReportController
     private function authCheck()
     {
         if (!isset($_SESSION['teacher_logged_in']) || $_SESSION['teacher_logged_in'] !== true) {
-            header('Location: /ewgs/');
+            header('Location: ' . BASE . '/');
             exit;
         }
     }
@@ -49,6 +49,23 @@ class UserReportController
         exit;
     }
 
+    // AJAX: all students grade data for print index cards
+    public function printData()
+    {
+        $this->authCheck();
+        $classId = (int) ($_GET['class_id'] ?? 0);
+        $quarter = $_GET['quarter'] ?? '';
+        if (!AdminModel::teacherOwnsClass((int) $_SESSION['teacher_id'], $classId)) {
+            http_response_code(403); echo json_encode(['error' => 'Access denied']); exit;
+        }
+        $data = AdminModel::getAllStudentsGradeReport($classId, $quarter);
+        $data['teacher'] = $_SESSION['teacher_name'] ?? '';
+        $data['quarter'] = $quarter;
+        header('Content-Type: application/json');
+        echo json_encode($data);
+        exit;
+    }
+
     // AJAX: dashboard chart data
     // No class_id → passing/failing overview per class
     // With class_id → passing/failing per subject for that class
@@ -56,11 +73,15 @@ class UserReportController
     {
         $this->authCheck();
         $classId = (int) ($_GET['class_id'] ?? 0);
+        $quarter = $_GET['quarter'] ?? '';
+        $allowed = ['1st','2nd','3rd','4th'];
+        $quarter = in_array($quarter, $allowed) ? $quarter : '';
+
         if ($classId > 0) {
             if (!AdminModel::teacherOwnsClass((int) $_SESSION['teacher_id'], $classId)) {
                 http_response_code(403); echo json_encode(['error' => 'Access denied']); exit;
             }
-            $data = AdminModel::getClassSubjectChart($classId);
+            $data = AdminModel::getClassSubjectChart($classId, $quarter);
         } else {
             $data = AdminModel::getDashboardChartData((int) $_SESSION['teacher_id']);
         }

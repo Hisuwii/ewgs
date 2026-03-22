@@ -6,7 +6,7 @@
     <title>Classes | EWGS</title>
     <?php require_once 'views/templates/admin/header.php'; ?>
     <?php require_once 'views/templates/admin/modal.php'; ?>
-    <link rel="stylesheet" href="/ewgs/public/css/tom-select.bootstrap5.min.css">
+    <link rel="stylesheet" href="<?= BASE ?>/public/css/tom-select.bootstrap5.min.css">
     <style>
         #addClass {
             background-color: #4b6b4b !important;
@@ -48,6 +48,16 @@
         .ts-wrapper.focus .ts-control {
             border-color: #4b6b4b !important;
             box-shadow: 0 0 0 2px rgba(75,107,75,0.15) !important;
+        }
+        .ts-wrapper.is-invalid .ts-control {
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 0 0.2rem rgba(220,53,69,0.18) !important;
+        }
+        .ts-invalid-feedback {
+            display: block;
+            font-size: 0.875em;
+            color: #dc3545;
+            margin-top: 4px;
         }
         .ts-dropdown .option { padding: 8px 12px; font-size: 14px; }
         .ts-dropdown .active  { background: #4b6b4b !important; color: #fff !important; }
@@ -98,7 +108,7 @@
     <div class="modal fade" id="addClassModal" tabindex="-1" aria-labelledby="addClassModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form id="addClassForm" method="POST" action="/ewgs/admin/class/add">
+                <form id="addClassForm" method="POST" action="<?= BASE ?>/admin/class/add">
                     <div class="modal-header">
                         <h5 class="modal-title" id="addClassModalLabel">Add New Class</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -149,7 +159,7 @@
     <div class="modal fade" id="editClassModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form id="editClassForm" method="POST" action="/ewgs/admin/class/edit">
+                <form id="editClassForm" method="POST" action="<?= BASE ?>/admin/class/edit">
                     <input type="hidden" name="class_id" id="editClassId">
                     <div class="modal-header">
                         <h5 class="modal-title">Edit Class</h5>
@@ -199,7 +209,7 @@
     <div class="modal fade" id="deleteClassModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <form id="deleteClassForm" method="POST" action="/ewgs/admin/class/delete">
+                <form id="deleteClassForm" method="POST" action="<?= BASE ?>/admin/class/delete">
                     <input type="hidden" name="class_id" id="deleteClassId">
                     <div class="modal-header">
                         <h5 class="modal-title">Delete Class</h5>
@@ -217,26 +227,112 @@
         </div>
     </div>
 
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <?php require_once 'views/templates/admin/datatable.php'; ?>
-    <script src="/ewgs/public/js/tom-select.complete.min.js"></script>
+    <script src="<?= BASE ?>/public/js/tom-select.complete.min.js"></script>
     <script>
         $(document).ready(function () {
             var pendingDeleteRow = null;
+            var origClassSnap    = '';
             var tsAddYear     = new TomSelect('#school_year',     { allowEmptyOption: true });
             var tsEditYear    = new TomSelect('#editClassYear',   { allowEmptyOption: true });
             var tsAddTeacher  = new TomSelect('#add_teacher_id',  { allowEmptyOption: true });
             var tsEditTeacher = new TomSelect('#edit_teacher_id', { allowEmptyOption: true });
             tsAddYear.setValue('<?= $defaultSy ?>');
 
+            /* ── Live duplicate check ──────────────────────────── */
+            function checkClassDuplicate(nameEl, gradeEl, excludeId, callback) {
+                var name  = $(nameEl).val().trim();
+                var grade = $(gradeEl).val().trim();
+                if (!name || !grade) { callback(false); return; }
+                $.get('<?= BASE ?>/admin/class/check', {
+                    class_name: name, grade_level: grade, exclude_id: excludeId || ''
+                }, function (res) { callback(res.exists); });
+            }
+
+            function showDupWarning(nameEl) {
+                $(nameEl).addClass('is-invalid').next('.dup-feedback').remove();
+                $(nameEl).after('<div class="dup-feedback invalid-feedback d-block">A class with this section name already exists in this grade level.</div>');
+            }
+            function clearDupWarning(nameEl) {
+                var $el = $(nameEl);
+                $el.next('.dup-feedback').remove();
+                // Only clear is-invalid if there's no digit-error still present
+                if (!$el.next('.name-invalid-feedback').length) {
+                    $el.removeClass('is-invalid');
+                }
+            }
+
+            // Live section name validation
+            function liveSectionCheck($el) {
+                var val = $el.val().trim();
+                var $btn = $el.closest('form').find('[type=submit]');
+                if (val === '') {
+                    $el.next('.name-invalid-feedback').remove();
+                    $el.removeClass('is-valid is-invalid');
+                    $btn.prop('disabled', false);
+                } else if (/[^a-zA-ZÀ-ÿ\s'\-]/.test(val)) {
+                    setTimeout(function () {
+                        var v = $el.val().trim();
+                        $el.next('.name-invalid-feedback').remove();
+                        if (/[^a-zA-ZÀ-ÿ\s'\-]/.test(v)) {
+                            $el.removeClass('is-valid').addClass('is-invalid')
+                               .after('<div class="name-invalid-feedback invalid-feedback">Section Name must only contain letters.</div>');
+                            $btn.prop('disabled', true);
+                        } else {
+                            $el.removeClass('is-invalid').addClass('is-valid');
+                            $btn.prop('disabled', false);
+                        }
+                    }, 0);
+                } else {
+                    $el.next('.name-invalid-feedback').remove();
+                    $el.removeClass('is-invalid').addClass('is-valid');
+                    $btn.prop('disabled', false);
+                }
+            }
+
+            $('#class_name, #editClassName').on('input change blur', function () {
+                liveSectionCheck($(this));
+            });
+
+            // Add form — check on blur of either field
+            $('#class_name, #grade_level').on('blur', function () {
+                checkClassDuplicate('#class_name', '#grade_level', null, function (exists) {
+                    exists ? showDupWarning('#class_name') : clearDupWarning('#class_name');
+                });
+            });
+            // Edit form — check on blur of either field
+            $('#editClassName, #editClassGrade').on('blur', function () {
+                var excludeId = $('#editClassId').val();
+                checkClassDuplicate('#editClassName', '#editClassGrade', excludeId, function (exists) {
+                    exists ? showDupWarning('#editClassName') : clearDupWarning('#editClassName');
+                });
+            });
+
+            function showTsError(ts, msg) {
+                $(ts.wrapper).addClass('is-invalid');
+                if (!$(ts.wrapper).next('.ts-invalid-feedback').length) {
+                    $(ts.wrapper).after('<div class="ts-invalid-feedback">' + msg + '</div>');
+                }
+            }
+            function clearTsError(ts) {
+                $(ts.wrapper).removeClass('is-invalid');
+                $(ts.wrapper).next('.ts-invalid-feedback').remove();
+            }
+
             var table = $('#classTable').DataTable({
+                serverSide: true,
+                processing: true,
+                searchDelay: 500,
+                order: [],
                 ajax: {
-                    url: '/ewgs/admin/class/data',
+                    url: '<?= BASE ?>/admin/class/data',
                     type: 'GET',
                     dataSrc: 'data'
                 },
                 columns: [
-                    { data: 'count', width: '5%' },
+                    { data: null, orderable: false, searchable: false, width: '5%',
+                      render: function(data, type, row, meta) { return meta.row + meta.settings._iDisplayStart + 1; } },
                     { data: 'class_name' },
                     { data: 'grade_level' },
                     { data: 'school_year' },
@@ -274,17 +370,31 @@
                     emptyTable: 'No classes found.'
                 }
             });
+            // Auto-refresh every 15s; fires immediately on tab focus if a refresh was missed
+            (function () {
+                var missed = false;
+                setInterval(function () {
+                    if (document.hidden) { missed = true; } else { table.ajax.reload(null, false); }
+                }, 15000);
+                document.addEventListener('visibilitychange', function () {
+                    if (!document.hidden && missed) { missed = false; table.ajax.reload(null, false); }
+                });
+            })();
 
             /* ── Add class AJAX ────────────────────────────────── */
             $('#addClassForm').on('submit', function (e) {
                 e.preventDefault();
-                if (!validateForm([
-                    { el: $('#class_name'),    label: 'Section Name', required: true, minLen: 2 },
-                    { el: $('#grade_level'),   label: 'Grade Level',  required: true, digits: true,
+                clearTsError(tsAddYear);
+                clearTsError(tsAddTeacher);
+                var ok = validateForm([
+                    { el: $('#class_name'),  label: 'Section Name', required: true, minLen: 2, noDigits: true },
+                    { el: $('#grade_level'), label: 'Grade Level',  required: true, digits: true,
                       pattern: /^[1-6]$/, patternMsg: 'Grade Level must be a number from 1 to 6.' },
-                    { el: $('#school_year'),   label: 'School Year',  required: true },
-                    { el: $('#add_teacher_id'), label: 'Teacher',     required: true }
-                ])) return;
+                ]);
+                if ($('#class_name').hasClass('is-invalid') && $('#class_name').next('.dup-feedback').length) ok = false;
+                if (!tsAddYear.getValue())    { showTsError(tsAddYear,    'School Year is required.'); ok = false; }
+                if (!tsAddTeacher.getValue()) { showTsError(tsAddTeacher, 'Teacher is required.');     ok = false; }
+                if (!ok) return;
                 var $btn = $(this).find('[type=submit]').prop('disabled', true);
                 bootstrap.Modal.getInstance(document.getElementById('addClassModal'))?.hide();
                 $('#preloader').fadeIn(200);
@@ -307,6 +417,9 @@
                 tsAddYear.setValue('');
                 tsAddTeacher.setValue('');
                 clearFormValidation($('#addClassForm'));
+                clearTsError(tsAddYear);
+                clearTsError(tsAddTeacher);
+                clearDupWarning('#class_name');
             });
 
             $('#classTable').on('click', '.btn-delete-class', function () {
@@ -345,23 +458,35 @@
                 }
                 tsEditYear.setValue(yr);
                 tsEditTeacher.setValue($(this).data('teacher') || '');
+                origClassSnap = $('#editClassForm').serialize();
                 bootstrap.Modal.getOrCreateInstance(document.getElementById('editClassModal')).show();
             });
 
             $('#editClassModal').on('hidden.bs.modal', function () {
                 tsEditTeacher.setValue('');
                 clearFormValidation($('#editClassForm'));
+                clearTsError(tsEditYear);
+                clearTsError(tsEditTeacher);
+                clearDupWarning('#editClassName');
             });
 
             $('#editClassForm').on('submit', function (e) {
                 e.preventDefault();
-                if (!validateForm([
-                    { el: $('#editClassName'),   label: 'Section Name', required: true, minLen: 2 },
-                    { el: $('#editClassGrade'),  label: 'Grade Level',  required: true, digits: true,
+                if ($('#editClassForm').serialize() === origClassSnap) {
+                    showToast('warning', 'No changes were made.');
+                    return;
+                }
+                clearTsError(tsEditYear);
+                clearTsError(tsEditTeacher);
+                var ok = validateForm([
+                    { el: $('#editClassName'),  label: 'Section Name', required: true, minLen: 2, noDigits: true },
+                    { el: $('#editClassGrade'), label: 'Grade Level',  required: true, digits: true,
                       pattern: /^[1-6]$/, patternMsg: 'Grade Level must be a number from 1 to 6.' },
-                    { el: $('#editClassYear'),   label: 'School Year',  required: true },
-                    { el: $('#edit_teacher_id'), label: 'Teacher',      required: true }
-                ])) return;
+                ]);
+                if ($('#editClassName').hasClass('is-invalid') && $('#editClassName').next('.dup-feedback').length) ok = false;
+                if (!tsEditYear.getValue())    { showTsError(tsEditYear,    'School Year is required.'); ok = false; }
+                if (!tsEditTeacher.getValue()) { showTsError(tsEditTeacher, 'Teacher is required.');     ok = false; }
+                if (!ok) return;
                 var $btn = $(this).find('[type=submit]').prop('disabled', true);
                 $('#preloader').fadeIn(200);
                 $.ajax({

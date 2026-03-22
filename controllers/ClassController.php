@@ -5,7 +5,7 @@ class ClassController
     public function index()
     {
         if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-            header('Location: /ewgs/admin');
+            header('Location: ' . BASE . '/admin');
             exit;
         }
 
@@ -18,37 +18,60 @@ class ClassController
     {
         if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
             http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
+            header('Content-Type: application/json');
+            echo json_encode(['draw' => (int)($_GET['draw']??1), 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => [], 'error' => 'Unauthorized']);
             exit;
         }
 
-        $classes = AdminModel::getAllClasses($_SESSION['user_id'] ?? null);
+        $adminId = $_SESSION['user_id'] ?? null;
+        $conn    = getConnection();
+        datatable_response(
+            $conn,
+            "SELECT c.class_id, c.class_name, c.grade_level, c.school_year,
+                    MIN(tc.teacher_id) AS teacher_id,
+                    GROUP_CONCAT(CONCAT(t.teacher_fname, ' ', t.teacher_lname) SEPARATOR ', ') AS teacher_name
+             FROM tbl_class c
+             LEFT JOIN tbl_teacher_class tc ON c.class_id = tc.class_id
+             LEFT JOIN tbl_teacher t ON tc.teacher_id = t.teacher_id
+             WHERE c.admin_id = ?",
+            ['c.class_name', 'c.grade_level', 'c.school_year'],
+            'c.class_id ASC',
+            'i', [$adminId],
+            fn($c) => [
+                'class_id'     => $c['class_id'],
+                'class_name'   => htmlspecialchars($c['class_name']),
+                'grade_level'  => htmlspecialchars($c['grade_level']),
+                'school_year'  => htmlspecialchars($c['school_year']),
+                'teacher_id'   => $c['teacher_id'] ?? null,
+                'teacher_name' => $c['teacher_name'] ? htmlspecialchars($c['teacher_name']) : null,
+            ],
+            'GROUP BY c.class_id',
+            [1 => 'c.class_name', 2 => 'c.grade_level', 3 => 'c.school_year']
+        );
+    }
 
-        $data = [];
-        $count = 1;
-        foreach ($classes as $class) {
-            $data[] = [
-                'count'        => $count++,
-                'class_id'     => $class['class_id'],
-                'class_name'   => htmlspecialchars($class['class_name']),
-                'grade_level'  => htmlspecialchars($class['grade_level']),
-                'school_year'  => htmlspecialchars($class['school_year']),
-                'teacher_id'   => $class['teacher_id'] ?? null,
-                'teacher_name' => $class['teacher_name']
-                    ? htmlspecialchars($class['teacher_name'])
-                    : null,
-            ];
+    public function checkDuplicate()
+    {
+        if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+            http_response_code(401); echo json_encode(['exists' => false]); exit;
         }
-
+        $adminId    = $_SESSION['user_id'] ?? null;
+        $className  = trim($_GET['class_name']  ?? '');
+        $gradeLevel = trim($_GET['grade_level'] ?? '');
+        $excludeId  = (int) ($_GET['exclude_id'] ?? 0) ?: null;
+        if ($className === '' || $gradeLevel === '') {
+            echo json_encode(['exists' => false]); exit;
+        }
+        $exists = AdminModel::isClassDuplicate($className, $gradeLevel, '', $excludeId, $adminId);
         header('Content-Type: application/json');
-        echo json_encode(['data' => $data]);
+        echo json_encode(['exists' => $exists]);
         exit;
     }
 
     public function add()
     {
         if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-            header('Location: /ewgs/admin');
+            header('Location: ' . BASE . '/admin');
             exit;
         }
 
@@ -65,10 +88,6 @@ class ClassController
             'school_year' => trim($_POST['school_year']),
             'admin_id'    => $adminId,
         ];
-
-        if (AdminModel::isClassDuplicate($data['class_name'], $data['grade_level'], $data['school_year'], null, $adminId)) {
-            $this->jsonResponse(false, 'A class with the same section name, grade level, and school year already exists.');
-        }
 
         $ok = AdminModel::addClass($data);
 
@@ -90,7 +109,7 @@ class ClassController
             setFlash('error', 'Failed to add class. Please try again.');
         }
 
-        header('Location: /ewgs/admin/class');
+        header('Location: ' . BASE . '/admin/class');
         exit;
     }
 
@@ -98,7 +117,7 @@ class ClassController
     {
         if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
             if ($this->isAjax()) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-            header('Location: /ewgs/admin'); exit;
+            header('Location: ' . BASE . '/admin'); exit;
         }
         $id        = (int) ($_POST['class_id']   ?? 0);
         $teacherId = (int) ($_POST['teacher_id'] ?? 0);
@@ -112,10 +131,6 @@ class ClassController
             'grade_level' => trim($_POST['grade_level'] ?? ''),
             'school_year' => trim($_POST['school_year'] ?? ''),
         ];
-        if (AdminModel::isClassDuplicate($data['class_name'], $data['grade_level'], $data['school_year'], $id, $_SESSION['user_id'] ?? null)) {
-            $this->jsonResponse(false, 'A class with the same section name, grade level, and school year already exists.');
-        }
-
         if ($id && AdminModel::updateClass($id, $data)) {
             // Replace teacher: unlink all current teachers then link the selected one
             AdminModel::unlinkTeacherFromClass($id);
@@ -131,7 +146,7 @@ class ClassController
     public function delete()
     {
         if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-            header('Location: /ewgs/admin');
+            header('Location: ' . BASE . '/admin');
             exit;
         }
 
@@ -141,7 +156,7 @@ class ClassController
         if ($result === 'fk') {
             if ($this->isAjax()) $this->jsonResponse(false, 'Cannot delete this class. It has students or grades linked to it.');
             setFlash('error', 'Cannot delete this class. It has students or grades linked to it.');
-            header('Location: /ewgs/admin/class'); exit;
+            header('Location: ' . BASE . '/admin/class'); exit;
         }
 
         if ($this->isAjax()) {
@@ -150,7 +165,7 @@ class ClassController
         }
 
         $result ? setFlash('success', 'Class deleted successfully.') : setFlash('error', 'Failed to delete class.');
-        header('Location: /ewgs/admin/class');
+        header('Location: ' . BASE . '/admin/class');
         exit;
     }
 
@@ -160,6 +175,7 @@ class ClassController
     }
 
     private function jsonResponse($success, $message) {
+        while (ob_get_level() > 0) ob_end_clean();
         header('Content-Type: application/json');
         echo json_encode(['success' => $success, 'message' => $message]);
         exit;

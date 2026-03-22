@@ -7,7 +7,7 @@
     <?php require_once 'views/templates/admin/header.php'; ?>
     <?php require_once 'views/templates/admin/modal.php'; ?>
     <?php require_once 'views/templates/admin/datatable.php'; ?>
-    <link rel="stylesheet" href="/ewgs/public/css/tom-select.bootstrap5.min.css">
+    <link rel="stylesheet" href="<?= BASE ?>/public/css/tom-select.bootstrap5.min.css">
     <style>
         .ts-wrapper .ts-control { border-color: #d0d8d0 !important; border-radius: 6px !important; min-height: 38px; font-size: 14px; }
         .ts-wrapper.focus .ts-control { border-color: #4b6b4b !important; box-shadow: 0 0 0 2px rgba(75,107,75,0.15) !important; }
@@ -26,7 +26,7 @@
 <div class="main-content">
     <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h4 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Linked Students</h4>
-        <a href="/ewgs/admin/assign/student" class="btn btn-sm btn-outline-secondary">
+        <a href="<?= BASE ?>/admin/assign/student" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-person-plus me-1"></i>Link Students to Class
         </a>
     </div>
@@ -91,8 +91,8 @@
     </div>
 </div>
 
-<script src="/ewgs/public/js/bootstrap.bundle.js"></script>
-<script src="/ewgs/public/js/tom-select.complete.min.js"></script>
+<script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
+<script src="<?= BASE ?>/public/js/tom-select.complete.min.js"></script>
 <script>
 $(function () {
     var currentClassId = null;
@@ -106,14 +106,19 @@ $(function () {
 
     /* ── DataTable ───────────────────────────────────── */
     var table = $('#enrolledTable').DataTable({
+        serverSide: true,
+        processing: true,
+        searchDelay: 500,
+        order: [],
         ajax: {
-            url: '/ewgs/admin/assign/student/data',
+            url: '<?= BASE ?>/admin/assign/student/data',
             type: 'GET',
-            data: function () { return currentClassId ? { class_id: currentClassId } : {}; },
+            data: function (d) { if (currentClassId) d.class_id = currentClassId; return d; },
             dataSrc: 'data'
         },
         columns: [
-            { data: 'count' },
+            { data: null, orderable: false, searchable: false,
+              render: function(data, type, row, meta) { return meta.row + meta.settings._iDisplayStart + 1; } },
             { data: 'student_name' },
             { data: 'lrn' },
             { data: 'gender' },
@@ -151,7 +156,7 @@ $(function () {
         if (!pendingStudentId || !pendingClassId) return;
         bootstrap.Modal.getOrCreateInstance($('#removeModal')[0]).hide();
 
-        $.post('/ewgs/admin/assign/student/unlink',
+        $.post('<?= BASE ?>/admin/assign/student/unlink',
             { student_id: pendingStudentId, class_id: pendingClassId },
             function (res) {
                 if (res.success) {

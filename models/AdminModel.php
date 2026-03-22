@@ -100,14 +100,28 @@ class AdminModel {
         return false;
     }
 
-    // Remove teacher
+    // Remove teacher — deletes teacher-class assignments first to avoid FK constraint
     public static function removeTeacher($id) {
         $conn = getConnection();
-        $stmt = $conn->prepare("DELETE FROM tbl_teacher WHERE teacher_id = ?");
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
-        if ($stmt->errno === 1451) return 'fk';
-        return $stmt->affected_rows > 0;
+        $conn->begin_transaction();
+        try {
+            // Remove class assignments first
+            $s1 = $conn->prepare("DELETE FROM tbl_teacher_class WHERE teacher_id = ?");
+            $s1->bind_param("i", $id);
+            $s1->execute();
+
+            $s2 = $conn->prepare("DELETE FROM tbl_teacher WHERE teacher_id = ?");
+            $s2->bind_param("i", $id);
+            $s2->execute();
+            $deleted = $s2->affected_rows > 0;
+
+            $conn->commit();
+            return $deleted;
+        } catch (mysqli_sql_exception $e) {
+            $conn->rollback();
+            if ($e->getCode() === 1451) return 'fk';
+            throw $e;
+        }
     }
 
     // Get all classes with their assigned teacher names (via tbl_teacher_class), scoped to admin
@@ -145,9 +159,9 @@ class AdminModel {
     // Check if a class with the same name, grade, and school year already exists (scoped to admin)
     public static function isClassDuplicate($className, $gradeLevel, $schoolYear, $excludeClassId = null, $adminId = null) {
         $conn   = getConnection();
-        $sql    = "SELECT COUNT(*) FROM tbl_class WHERE class_name = ? AND grade_level = ? AND school_year = ?";
-        $types  = "sss";
-        $params = [$className, $gradeLevel, $schoolYear];
+        $sql    = "SELECT COUNT(*) FROM tbl_class WHERE class_name = ? AND grade_level = ?";
+        $types  = "ss";
+        $params = [$className, $gradeLevel];
         if ($excludeClassId) { $sql .= " AND class_id != ?";  $types .= "i"; $params[] = $excludeClassId; }
         if ($adminId !== null) { $sql .= " AND admin_id = ?"; $types .= "i"; $params[] = $adminId; }
         $stmt = $conn->prepare($sql);
@@ -178,8 +192,12 @@ class AdminModel {
         $conn = getConnection();
         $stmt = $conn->prepare("DELETE FROM tbl_class WHERE class_id = ?");
         $stmt->bind_param("i", $id);
-        $stmt->execute();
-        if ($stmt->errno === 1451) return 'fk';
+        try {
+            $stmt->execute();
+        } catch (mysqli_sql_exception $e) {
+            if ($e->getCode() === 1451) return 'fk';
+            throw $e;
+        }
         return $stmt->affected_rows > 0;
     }
 
@@ -224,67 +242,125 @@ class AdminModel {
         $conn    = getConnection();
         $adminId = $data['admin_id'] ?? null;
 
-        // Insert subject
-        $stmt = $conn->prepare("INSERT INTO tbl_subject (subject_name, admin_id) VALUES (?, ?)");
-        $stmt->bind_param("si", $data['subject_name'], $adminId);
-        if (!$stmt->execute()) {
-            return false;
-        }
-        $subjectId = $conn->insert_id;
+        $conn->begin_transaction();
+        try {
+            // Insert subject
+            $stmt = $conn->prepare("INSERT INTO tbl_subject (subject_name, admin_id) VALUES (?, ?)");
+            $stmt->bind_param("si", $data['subject_name'], $adminId);
+            if (!$stmt->execute()) throw new Exception('Failed to insert subject');
+            $subjectId = $conn->insert_id;
 
-        // Link to class
-        if (!empty($data['class_id'])) {
-            $stmt2 = $conn->prepare("INSERT INTO tbl_subject_class (subject_id, class_id) VALUES (?, ?)");
-            $stmt2->bind_param("ii", $subjectId, $data['class_id']);
-            $stmt2->execute();
-        }
+            // Link to class
+            if (!empty($data['class_id'])) {
+                $stmt2 = $conn->prepare("INSERT INTO tbl_subject_class (subject_id, class_id) VALUES (?, ?)");
+                $stmt2->bind_param("ii", $subjectId, $data['class_id']);
+                if (!$stmt2->execute()) throw new Exception('Failed to link subject to class');
+            }
 
-        // Insert grading components and their activities
-        $components = [
-            [
-                'name'   => 'Written Work',
-                'pct'    => (float) $data['written_percentage'] / 100,
-                'count'  => (int)   $data['written_count'],
-                'scores' => $data['written_activity_score'] ?? [],
-            ],
-            [
-                'name'   => 'Performance Task',
-                'pct'    => (float) $data['performance_percentage'] / 100,
-                'count'  => (int)   $data['performance_count'],
-                'scores' => $data['performance_activity_score'] ?? [],
-            ],
-            [
-                'name'   => 'Quarterly Exam',
-                'pct'    => (float) $data['quarterly_percentage'] / 100,
-                'count'  => (int)   $data['quarterly_count'],
-                'scores' => $data['quarterly_activity_score'] ?? [],
-            ],
-        ];
+            // Insert grading components and their activities
+            $components = [
+                [
+                    'name'   => 'Written Work',
+                    'pct'    => (float) $data['written_percentage'] / 100,
+                    'count'  => (int)   $data['written_count'],
+                    'scores' => $data['written_activity_score'] ?? [],
+                ],
+                [
+                    'name'   => 'Performance Task',
+                    'pct'    => (float) $data['performance_percentage'] / 100,
+                    'count'  => (int)   $data['performance_count'],
+                    'scores' => $data['performance_activity_score'] ?? [],
+                ],
+                [
+                    'name'   => 'Quarterly Exam',
+                    'pct'    => (float) $data['quarterly_percentage'] / 100,
+                    'count'  => (int)   $data['quarterly_count'],
+                    'scores' => $data['quarterly_activity_score'] ?? [],
+                ],
+            ];
 
-        foreach ($components as $comp) {
-            $stmtComp = $conn->prepare(
-                "INSERT INTO tbl_grading_component (subject_id, component_name, percentage, activity_count)
-                 VALUES (?, ?, ?, ?)"
-            );
-            $stmtComp->bind_param("isdi", $subjectId, $comp['name'], $comp['pct'], $comp['count']);
-            $stmtComp->execute();
-            $componentId = $conn->insert_id;
-
-            $order = 1;
-            foreach ($comp['scores'] as $score) {
-                $label    = ($comp['name'] === 'Quarterly Exam') ? 'Exam ' . $order : 'Activity ' . $order;
-                $scoreVal = (float) $score;
-                $stmtAct  = $conn->prepare(
-                    "INSERT INTO tbl_activity (component_id, activity_name, perfect_score, activity_order)
+            foreach ($components as $comp) {
+                $stmtComp = $conn->prepare(
+                    "INSERT INTO tbl_grading_component (subject_id, component_name, percentage, activity_count)
                      VALUES (?, ?, ?, ?)"
                 );
-                $stmtAct->bind_param("isdi", $componentId, $label, $scoreVal, $order);
-                $stmtAct->execute();
-                $order++;
+                $stmtComp->bind_param("isdi", $subjectId, $comp['name'], $comp['pct'], $comp['count']);
+                if (!$stmtComp->execute()) throw new Exception('Failed to insert component: ' . $comp['name']);
+                $componentId = $conn->insert_id;
+
+                $order = 1;
+                foreach ($comp['scores'] as $score) {
+                    $label    = ($comp['name'] === 'Quarterly Exam') ? 'Exam ' . $order : 'Activity ' . $order;
+                    $scoreVal = (float) $score;
+                    $stmtAct  = $conn->prepare(
+                        "INSERT INTO tbl_activity (component_id, activity_name, perfect_score, activity_order)
+                         VALUES (?, ?, ?, ?)"
+                    );
+                    $stmtAct->bind_param("isdi", $componentId, $label, $scoreVal, $order);
+                    if (!$stmtAct->execute()) throw new Exception('Failed to insert activity');
+                    $order++;
+                }
+            }
+
+            $conn->commit();
+            return true;
+        } catch (Exception $e) {
+            $conn->rollback();
+            error_log('addSubject transaction failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Get subject + components + activities for edit modal
+    public static function getSubjectForEdit($subjectId) {
+        $conn = getConnection();
+        $stmt = $conn->prepare("
+            SELECT s.subject_id, s.subject_name,
+                   sc.class_id AS current_class_id
+            FROM tbl_subject s
+            LEFT JOIN tbl_subject_class sc ON sc.subject_id = s.subject_id
+            WHERE s.subject_id = ?
+            LIMIT 1
+        ");
+        $stmt->bind_param("i", $subjectId);
+        $stmt->execute();
+        $subject = $stmt->get_result()->fetch_assoc();
+        if (!$subject) return null;
+
+        $stmt2 = $conn->prepare("
+            SELECT gc.component_id, gc.component_name, gc.percentage,
+                   a.activity_id, a.perfect_score, a.activity_order
+            FROM tbl_grading_component gc
+            LEFT JOIN tbl_activity a ON a.component_id = gc.component_id
+            WHERE gc.subject_id = ?
+            ORDER BY FIELD(gc.component_name, 'Written Work', 'Performance Task', 'Quarterly Exam'),
+                     a.activity_order ASC
+        ");
+        $stmt2->bind_param("i", $subjectId);
+        $stmt2->execute();
+        $rows = $stmt2->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        $components = [];
+        foreach ($rows as $row) {
+            $name = $row['component_name'];
+            if (!isset($components[$name])) {
+                $components[$name] = [
+                    'component_id'   => $row['component_id'],
+                    'component_name' => $name,
+                    'percentage'     => (float) $row['percentage'] * 100,
+                    'activities'     => [],
+                ];
+            }
+            if ($row['activity_id']) {
+                $components[$name]['activities'][] = [
+                    'activity_id'   => $row['activity_id'],
+                    'perfect_score' => (float) $row['perfect_score'],
+                    'activity_order'=> (int)   $row['activity_order'],
+                ];
             }
         }
-
-        return true;
+        $subject['components'] = array_values($components);
+        return $subject;
     }
 
     // Update subject name only (components affect grading integrity)
@@ -295,13 +371,94 @@ class AdminModel {
         return $stmt->execute();
     }
 
+    // Full subject update: name + component percentages + activities
+    public static function updateSubjectFull($data) {
+        $conn      = getConnection();
+        $subjectId = (int) $data['subject_id'];
+
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare("UPDATE tbl_subject SET subject_name=? WHERE subject_id=?");
+            $stmt->bind_param("si", $data['subject_name'], $subjectId);
+            if (!$stmt->execute()) throw new Exception('Failed to update subject name');
+
+            // Update class assignment
+            $newClassId = !empty($data['class_id']) ? (int)$data['class_id'] : null;
+            $sd = $conn->prepare("DELETE FROM tbl_subject_class WHERE subject_id=?");
+            $sd->bind_param("i", $subjectId);
+            if (!$sd->execute()) throw new Exception('Failed to remove old class link');
+            if ($newClassId) {
+                $si = $conn->prepare("INSERT INTO tbl_subject_class (subject_id, class_id) VALUES (?,?)");
+                $si->bind_param("ii", $subjectId, $newClassId);
+                if (!$si->execute()) throw new Exception('Failed to link new class');
+            }
+
+            $components = [
+                'Written Work'     => ['pct' => (float)$data['written_percentage']     / 100, 'scores' => $data['written_activity_score']     ?? []],
+                'Performance Task' => ['pct' => (float)$data['performance_percentage'] / 100, 'scores' => $data['performance_activity_score'] ?? []],
+                'Quarterly Exam'   => ['pct' => (float)$data['quarterly_percentage']   / 100, 'scores' => $data['quarterly_activity_score']  ?? []],
+            ];
+
+            foreach ($components as $compName => $compData) {
+                $s = $conn->prepare("SELECT component_id FROM tbl_grading_component WHERE subject_id=? AND component_name=?");
+                $s->bind_param("is", $subjectId, $compName);
+                $s->execute();
+                $comp = $s->get_result()->fetch_assoc();
+                if (!$comp) continue;
+                $compId    = $comp['component_id'];
+                $newScores = array_values($compData['scores']);
+                $cnt       = count($newScores);
+
+                $su = $conn->prepare("UPDATE tbl_grading_component SET percentage=?, activity_count=? WHERE component_id=?");
+                $su->bind_param("dii", $compData['pct'], $cnt, $compId);
+                if (!$su->execute()) throw new Exception('Failed to update component: ' . $compName);
+
+                $se = $conn->prepare("SELECT activity_id FROM tbl_activity WHERE component_id=? ORDER BY activity_order ASC");
+                $se->bind_param("i", $compId);
+                $se->execute();
+                $existing = array_column($se->get_result()->fetch_all(MYSQLI_ASSOC), 'activity_id');
+
+                foreach ($newScores as $i => $score) {
+                    $order = $i + 1;
+                    $ps    = (float) $score;
+                    $label = ($compName === 'Quarterly Exam') ? 'Exam ' . $order : 'Activity ' . $order;
+                    if (isset($existing[$i])) {
+                        $upd = $conn->prepare("UPDATE tbl_activity SET perfect_score=?, activity_order=? WHERE activity_id=?");
+                        $upd->bind_param("dii", $ps, $order, $existing[$i]);
+                        if (!$upd->execute()) throw new Exception('Failed to update activity');
+                    } else {
+                        $ins = $conn->prepare("INSERT INTO tbl_activity (component_id, activity_name, perfect_score, activity_order) VALUES (?,?,?,?)");
+                        $ins->bind_param("isdi", $compId, $label, $ps, $order);
+                        if (!$ins->execute()) throw new Exception('Failed to insert activity');
+                    }
+                }
+                for ($i = $cnt; $i < count($existing); $i++) {
+                    $del = $conn->prepare("DELETE FROM tbl_activity WHERE activity_id=?");
+                    $del->bind_param("i", $existing[$i]);
+                    if (!$del->execute()) throw new Exception('Failed to delete old activity');
+                }
+            }
+
+            $conn->commit();
+            return true;
+        } catch (Exception $e) {
+            $conn->rollback();
+            error_log('updateSubjectFull transaction failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
     // Remove subject
     public static function removeSubject($id) {
         $conn = getConnection();
         $stmt = $conn->prepare("DELETE FROM tbl_subject WHERE subject_id = ?");
         $stmt->bind_param("i", $id);
-        $stmt->execute();
-        if ($stmt->errno === 1451) return 'fk';
+        try {
+            $stmt->execute();
+        } catch (mysqli_sql_exception $e) {
+            if ($e->getCode() === 1451) return 'fk';
+            throw $e;
+        }
         return $stmt->affected_rows > 0;
     }
 
@@ -339,8 +496,12 @@ class AdminModel {
         $conn = getConnection();
         $stmt = $conn->prepare("DELETE FROM tbl_student WHERE student_id = ?");
         $stmt->bind_param("i", $id);
-        $stmt->execute();
-        if ($stmt->errno === 1451) return 'fk';
+        try {
+            $stmt->execute();
+        } catch (mysqli_sql_exception $e) {
+            if ($e->getCode() === 1451) return 'fk';
+            throw $e;
+        }
         return $stmt->affected_rows > 0;
     }
 
@@ -776,7 +937,39 @@ class AdminModel {
         ");
         $stmt->bind_param("i", $teacherId);
         $stmt->execute();
-        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        $conn2 = getConnection();
+        foreach ($rows as &$row) {
+            $classId2 = (int)$row['class_id'];
+
+            // Complete = every student has a tbl_grade record for every subject,
+            // for all 4 quarters.
+            $studentCount2  = (int)$row['student_count'];
+            $subjectCount2  = (int)$row['subject_count'];
+            $expectedPerQ   = $studentCount2 * $subjectCount2;
+
+            if ($expectedPerQ === 0) { $row['is_complete'] = 0; continue; }
+
+            $sm = $conn2->prepare("
+                SELECT g.quarter, COUNT(*) AS cnt
+                FROM tbl_grade g
+                INNER JOIN tbl_subject_class sc ON g.subject_class_id = sc.subject_class_id
+                WHERE sc.class_id = ?
+                GROUP BY g.quarter
+            ");
+            $sm->bind_param("i", $classId2); $sm->execute();
+            $quarterCounts = $sm->get_result()->fetch_all(MYSQLI_ASSOC);
+            if (empty($quarterCounts)) {
+                $row['is_complete'] = 0;
+            } else {
+                $row['is_complete'] = 1;
+                foreach ($quarterCounts as $qc) {
+                    if ((int)$qc['cnt'] < $expectedPerQ) { $row['is_complete'] = 0; break; }
+                }
+            }
+        }
+        return $rows;
     }
 
     // Get grading structure: components + activities for a subject
@@ -946,16 +1139,19 @@ class AdminModel {
         $stmt = $conn->prepare("
             SELECT sub.subject_name,
                    g.written_work, g.performance_task, g.quarterly_exam, g.final_grade,
+                   s.student_lrn AS lrn, s.student_gender AS gender,
                    COALESCE(MAX(CASE WHEN gc.component_name = 'Written Work'     THEN gc.percentage END), 0.25) AS ww_weight,
                    COALESCE(MAX(CASE WHEN gc.component_name = 'Performance Task' THEN gc.percentage END), 0.50) AS pt_weight,
                    COALESCE(MAX(CASE WHEN gc.component_name = 'Quarterly Exam'   THEN gc.percentage END), 0.25) AS qe_weight
             FROM tbl_grade g
+            INNER JOIN tbl_student s         ON g.student_id = s.student_id
             INNER JOIN tbl_subject_class sc  ON g.subject_class_id = sc.subject_class_id
             INNER JOIN tbl_subject sub       ON sc.subject_id = sub.subject_id
             LEFT  JOIN tbl_grading_component gc ON gc.subject_id = sub.subject_id
             WHERE g.student_id = ? AND sc.class_id = ? AND g.quarter = ?
             GROUP BY sub.subject_id, sub.subject_name,
-                     g.written_work, g.performance_task, g.quarterly_exam, g.final_grade
+                     g.written_work, g.performance_task, g.quarterly_exam, g.final_grade,
+                     s.student_lrn, s.student_gender
             ORDER BY sub.subject_name ASC
         ");
         $stmt->bind_param("iis", $studentId, $classId, $quarter);
@@ -980,12 +1176,40 @@ class AdminModel {
         ");
         $stmt->bind_param("i", $teacherId);
         $stmt->execute();
-        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        $conn2 = getConnection();
+        foreach ($rows as &$row) {
+            $students  = 0; $subjects = 0;
+            $s1 = $conn2->prepare("SELECT COUNT(*) AS cnt FROM tbl_student_class WHERE class_id = ?");
+            $s1->bind_param("i", $row['class_id']); $s1->execute();
+            $students = (int)$s1->get_result()->fetch_assoc()['cnt'];
+
+            $s2 = $conn2->prepare("SELECT COUNT(*) AS cnt FROM tbl_subject_class WHERE class_id = ?");
+            $s2->bind_param("i", $row['class_id']); $s2->execute();
+            $subjects = (int)$s2->get_result()->fetch_assoc()['cnt'];
+
+            $expected = $students * $subjects;
+            $s3 = $conn2->prepare("
+                SELECT MIN(qcnt) AS min_qcnt FROM (
+                    SELECT COUNT(*) AS qcnt
+                    FROM tbl_grade g2
+                    INNER JOIN tbl_subject_class sc2 ON g2.subject_class_id = sc2.subject_class_id
+                    WHERE sc2.class_id = ?
+                    GROUP BY g2.quarter
+                ) quarter_counts
+            ");
+            $s3->bind_param("i", $row['class_id']); $s3->execute();
+            $res = $s3->get_result()->fetch_assoc();
+            $row['is_complete'] = ($expected > 0 && $res['min_qcnt'] !== null && (int)$res['min_qcnt'] >= $expected) ? 1 : 0;
+        }
+        return $rows;
     }
 
     // Dashboard chart: passing/failing per subject for a specific class (all quarters)
-    public static function getClassSubjectChart($classId) {
+    public static function getClassSubjectChart($classId, $quarter = '') {
         $conn = getConnection();
+        $quarterClause = $quarter ? "AND g.quarter = ?" : "";
         $stmt = $conn->prepare("
             SELECT sub.subject_name,
                    SUM(CASE WHEN g.final_grade >= 75 THEN 1 ELSE 0 END) AS passed,
@@ -994,13 +1218,71 @@ class AdminModel {
             FROM tbl_grade g
             INNER JOIN tbl_subject_class sc ON g.subject_class_id = sc.subject_class_id
             INNER JOIN tbl_subject sub      ON sc.subject_id = sub.subject_id
-            WHERE sc.class_id = ?
+            WHERE sc.class_id = ? $quarterClause
             GROUP BY sub.subject_id, sub.subject_name
             ORDER BY sub.subject_name ASC
         ");
-        $stmt->bind_param("i", $classId);
+        if ($quarter) {
+            $stmt->bind_param("is", $classId, $quarter);
+        } else {
+            $stmt->bind_param("i", $classId);
+        }
         $stmt->execute();
-        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        $conn2 = getConnection();
+
+        // Class-level completion: every enrolled student must have a tbl_grade record
+        // for every subject in the class, for the selected quarter(s).
+        $s1 = $conn2->prepare("SELECT COUNT(*) AS cnt FROM tbl_student_class WHERE class_id = ?");
+        $s1->bind_param("i", $classId); $s1->execute();
+        $studentCount = (int)$s1->get_result()->fetch_assoc()['cnt'];
+
+        $s2 = $conn2->prepare("SELECT COUNT(*) AS cnt FROM tbl_subject_class WHERE class_id = ?");
+        $s2->bind_param("i", $classId); $s2->execute();
+        $subjectCount = (int)$s2->get_result()->fetch_assoc()['cnt'];
+
+        // Expected grade records per quarter = students × subjects
+        $expectedPerQuarter = $studentCount * $subjectCount;
+
+        if ($expectedPerQuarter === 0) {
+            $classIsComplete = 0;
+        } elseif ($quarter) {
+            // Single quarter: count distinct student-subject pairs graded
+            $s3 = $conn2->prepare("
+                SELECT COUNT(*) AS cnt
+                FROM tbl_grade g
+                INNER JOIN tbl_subject_class sc ON g.subject_class_id = sc.subject_class_id
+                WHERE sc.class_id = ? AND g.quarter = ?
+            ");
+            $s3->bind_param("is", $classId, $quarter); $s3->execute();
+            $graded = (int)$s3->get_result()->fetch_assoc()['cnt'];
+            $classIsComplete = ($graded >= $expectedPerQuarter) ? 1 : 0;
+        } else {
+            // All quarters view: every quarter that has been started must be fully graded
+            $s3 = $conn2->prepare("
+                SELECT g.quarter, COUNT(*) AS cnt
+                FROM tbl_grade g
+                INNER JOIN tbl_subject_class sc ON g.subject_class_id = sc.subject_class_id
+                WHERE sc.class_id = ?
+                GROUP BY g.quarter
+            ");
+            $s3->bind_param("i", $classId); $s3->execute();
+            $quarterCounts = $s3->get_result()->fetch_all(MYSQLI_ASSOC);
+            if (empty($quarterCounts)) {
+                $classIsComplete = 0;
+            } else {
+                $classIsComplete = 1;
+                foreach ($quarterCounts as $qc) {
+                    if ((int)$qc['cnt'] < $expectedPerQuarter) { $classIsComplete = 0; break; }
+                }
+            }
+        }
+
+        foreach ($rows as &$row) {
+            $row['is_complete'] = $classIsComplete;
+        }
+        return $rows;
     }
 
     // Students with at least one grade in a class/quarter (for report student picker)
@@ -1018,6 +1300,43 @@ class AdminModel {
         $stmt->bind_param("is", $classId, $quarter);
         $stmt->execute();
         return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+
+    // Print: all students with their grades for a class/quarter (index card generation)
+    public static function getAllStudentsGradeReport($classId, $quarter) {
+        $conn = getConnection();
+        // Student grades
+        $stmt = $conn->prepare("
+            SELECT s.student_id,
+                   CONCAT(s.student_lname, ', ', s.student_fname) AS full_name,
+                   s.student_lrn AS lrn,
+                   s.student_gender AS gender,
+                   sub.subject_name,
+                   g.written_work, g.performance_task, g.quarterly_exam, g.final_grade,
+                   COALESCE(MAX(CASE WHEN gc.component_name = 'Written Work'     THEN gc.percentage END), 0.25) AS ww_weight,
+                   COALESCE(MAX(CASE WHEN gc.component_name = 'Performance Task' THEN gc.percentage END), 0.50) AS pt_weight,
+                   COALESCE(MAX(CASE WHEN gc.component_name = 'Quarterly Exam'   THEN gc.percentage END), 0.25) AS qe_weight
+            FROM tbl_student s
+            INNER JOIN tbl_grade g            ON s.student_id = g.student_id
+            INNER JOIN tbl_subject_class sc   ON g.subject_class_id = sc.subject_class_id
+            INNER JOIN tbl_subject sub        ON sc.subject_id = sub.subject_id
+            LEFT  JOIN tbl_grading_component gc ON gc.subject_id = sub.subject_id
+            WHERE sc.class_id = ? AND g.quarter = ?
+            GROUP BY s.student_id, sub.subject_id, sub.subject_name,
+                     g.written_work, g.performance_task, g.quarterly_exam, g.final_grade
+            ORDER BY s.student_lname ASC, s.student_fname ASC, sub.subject_name ASC
+        ");
+        $stmt->bind_param("is", $classId, $quarter);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        // Class info
+        $cs = $conn->prepare("SELECT class_name, grade_level, school_year FROM tbl_class WHERE class_id = ?");
+        $cs->bind_param("i", $classId);
+        $cs->execute();
+        $classInfo = $cs->get_result()->fetch_assoc();
+
+        return ['grades' => $rows, 'class' => $classInfo];
     }
 
     // Export: quarters where every student has a grade for every subject in the class

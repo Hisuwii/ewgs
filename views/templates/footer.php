@@ -4,12 +4,12 @@
     </footer>
 
     <!-- jQuery (local) -->
-    <script src="/ewgs/public/js/jquery.min.js"></script>
+    <script src="<?= BASE ?>/public/js/jquery.min.js"></script>
 
     <!-- Bootstrap JS (local) -->
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
 
     <!-- Your custom JS -->
-    <script src="/ewgs/public/js/app.js"></script>
+    <script src="<?= BASE ?>/public/js/app.js"></script>
 </body>
 </html>

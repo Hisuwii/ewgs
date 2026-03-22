@@ -87,14 +87,21 @@
     body.dark-mode .modal-body .form-label {
         color: #e0e0e0;
     }
-    body.dark-mode .modal-body .form-control {
+    body.dark-mode .modal-body .form-control,
+    body.dark-mode .modal-body .form-select {
         background-color: #2d2d2d;
         border-color: #444;
-        color: #fff;
+        color: #e0e0e0;
     }
-    body.dark-mode .modal-body .form-control:focus {
+    body.dark-mode .modal-body .form-control::placeholder {
+        color: #6b6b6b;
+    }
+    body.dark-mode .modal-body .form-control:focus,
+    body.dark-mode .modal-body .form-select:focus {
         border-color: #4b6b4b;
         box-shadow: 0 0 0 3px rgba(75, 107, 75, 0.3);
+        background-color: #2d2d2d;
+        color: #e0e0e0;
     }
     body.dark-mode .modal-footer {
         background-color: #1e1e1e;

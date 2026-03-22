@@ -14,25 +14,25 @@ function isActive($page) {
 
 <div class="sidebar">
     <div class="logo">
-        <img src="/ewgs/public/images/logo.png" alt="Logo">
+        <img src="<?= BASE ?>/public/images/logo.png" alt="Logo">
         <h5>Elementary Web Grading System</h5>
     </div>
 
     <div class="sidebar-body">
         <nav class="nav flex-column px-3">
-            <a href="/ewgs/admin/AdminDashboard" class="nav-link <?= isActive('AdminDashboard') ?>">
+            <a href="<?= BASE ?>/admin/AdminDashboard" class="nav-link <?= isActive('AdminDashboard') ?>">
                 <span><i class="bi bi-speedometer2 "></i> Dashboard</span>
             </a>
 
-            <a href="/ewgs/admin/teacher" class="nav-link <?= isActive('admin/teacher') && !isActive('teacher/logs') ? 'active' : '' ?>">
+            <a href="<?= BASE ?>/admin/teacher" class="nav-link <?= isActive('admin/teacher') && !isActive('teacher/logs') ? 'active' : '' ?>">
                 <span><i class="bi bi-person-badge"></i> Teachers</span>
             </a>
 
-            <a href="/ewgs/admin/class" class="nav-link <?= isActive('admin/class') ?>">
+            <a href="<?= BASE ?>/admin/class" class="nav-link <?= isActive('admin/class') ?>">
                 <span><i class="bi bi-person-badge"></i> Classes</span>
             </a>
 
-            <a href="/ewgs/admin/subject" class="nav-link <?= isActive('admin/subject') ?>">
+            <a href="<?= BASE ?>/admin/subject" class="nav-link <?= isActive('admin/subject') ?>">
                 <span><i class="bi bi-book"></i> Subjects</span>
             </a>
 
@@ -43,18 +43,18 @@ function isActive($page) {
                 <i class="bi bi-chevron-down" style="font-size:12px;"></i>
             </a>
             <div class="collapse <?= (strpos($_SERVER['REQUEST_URI'], '/admin/student') !== false || strpos($_SERVER['REQUEST_URI'], '/admin/assign/student') !== false) ? 'show' : '' ?>" id="studentsMenu">
-                <a href="/ewgs/admin/student" class="nav-link ps-2 <?= isActive('admin/student') && !isActive('assign/student') ? 'active' : '' ?>">
+                <a href="<?= BASE ?>/admin/student" class="nav-link ps-2 <?= isActive('admin/student') && !isActive('assign/student') ? 'active' : '' ?>">
                     <span><i class="bi bi-person-lines-fill me-1"></i> Student List</span>
                 </a>
-                <a href="/ewgs/admin/assign/student" class="nav-link ps-2 <?= isActive('assign/student') && !isActive('assign/student/enrolled') ? 'active' : '' ?>">
+                <a href="<?= BASE ?>/admin/assign/student" class="nav-link ps-2 <?= isActive('assign/student') && !isActive('assign/student/enrolled') ? 'active' : '' ?>">
                     <span><i class="bi bi-person-plus me-1"></i> Link to Class</span>
                 </a>
-                <a href="/ewgs/admin/assign/student/enrolled" class="nav-link ps-2 <?= isActive('assign/student/enrolled') ?>">
+                <a href="<?= BASE ?>/admin/assign/student/enrolled" class="nav-link ps-2 <?= isActive('assign/student/enrolled') ?>">
                     <span><i class="bi bi-card-checklist me-1"></i> Linked Students</span>
                 </a>
             </div>
 
-            <a href="/ewgs/admin/teacher/logs" class="nav-link <?= isActive('teacher/logs') ?>">
+            <a href="<?= BASE ?>/admin/teacher/logs" class="nav-link <?= isActive('teacher/logs') ?>">
                 <span><i class="bi bi-journal-text"></i> Teacher Logs</span>
             </a>
         </nav>
@@ -68,19 +68,28 @@ function isActive($page) {
                 <small>Administrator</small>
             </div>
         </div>
-        <div class="dropdown">
-            <button class="btn dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown">
+        <div class="dropdown dropup">
+            <button class="btn dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="bi bi-three-dots-vertical"></i>
             </button>
-            <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="/ewgs/admin/profile">Profile</a></li>
-                 <li class="dropdown-item d-flex justify-content-between align-items-center" style="min-width: 160px;">
-                    <span>Appearance</span>
-                    <div class="form-check form-switch m-0 ms-4">
-                        <input class="form-check-input" type="checkbox" role="switch" id="mode-toggle">
-                    </div>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="<?= BASE ?>/admin/profile">
+                    <i class="bi bi-person"></i> Profile
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <label class="dropdown-item" style="cursor:pointer;">
+                        <i class="bi bi-moon-stars"></i>
+                        <span style="flex:1;">Dark Mode</span>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="mode-toggle">
+                        </div>
+                    </label>
                 </li>
-                <li><a class="dropdown-item" href="/ewgs/admin/AdminLogin">Logout</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-danger" href="<?= BASE ?>/admin/AdminLogin">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </a></li>
             </ul>
         </div>
     </div>
@@ -97,8 +106,8 @@ $(document).ready(function(){
             $('#preloader').fadeOut(400);
         }
     }
-    $(window).on('load', hidePreloader);
-    setTimeout(hidePreloader, 3000); // max wait 3 s — prevents stuck preloader if a resource stalls
+    hidePreloader(); // hide as soon as DOM is ready — don't wait for CDN scripts
+    $(window).on('load', hidePreloader); // fallback if somehow DOM ready fires before this
 
     // ========== DARK MODE ==========
     // localStorage saves data in the browser (persists even after closing)
@@ -169,13 +178,35 @@ $(document).ready(function(){
         }
     });
 
+    // ── Real-time blur validation for modal form fields ──
+    $(document).on('blur', '.modal .form-control[required], .modal .form-select[required]', function () {
+        var $el  = $(this);
+        var val  = ($el.val() || '').trim();
+        $el.removeClass('is-invalid is-valid').next('.invalid-feedback').remove();
+        var msg  = '';
+        if (!val) {
+            msg = 'This field is required.';
+        } else if ($el.attr('type') === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+            msg = 'Enter a valid email address.';
+        } else if ($el.attr('minlength') && val.length < parseInt($el.attr('minlength'))) {
+            msg = 'Minimum ' + $el.attr('minlength') + ' characters required.';
+        } else if ($el.attr('pattern') && !new RegExp('^(?:' + $el.attr('pattern') + ')$').test(val)) {
+            msg = $el.attr('title') || 'Invalid format.';
+        }
+        if (msg) {
+            $el.addClass('is-invalid').after('<div class="invalid-feedback">' + msg + '</div>');
+        } else {
+            $el.addClass('is-valid');
+        }
+    });
+
 });
 
 // ── Session Idle Timeout ─────────────────────────────────────────────────────
 (function () {
     var WARN_AT    = 25 * 60 * 1000;   // show warning after 25 min idle
     var LOGOUT_AT  = 30 * 60 * 1000;   // auto-logout after 30 min idle
-    var LOGOUT_URL = '/ewgs/admin/AdminLogin';
+    var LOGOUT_URL = '<?= BASE ?>/admin/AdminLogin';
     var warnTimer, logoutTimer;
     var $modal, modalInstance;
 
@@ -206,7 +237,7 @@ $(document).ready(function(){
             modalInstance.hide();
             resetTimers();
             // Ping server to refresh last_activity
-            $.get('/ewgs/admin/AdminDashboard/ping').always(function () {});
+            $.get('<?= BASE ?>/admin/AdminDashboard/ping').always(function () {});
         });
     }
 
@@ -279,6 +310,7 @@ function validateForm(fields) {
 
         if      (f.required && !val)                                         { msg = (f.label || 'This field') + ' is required.'; }
         else if (val && f.minLen  && val.length < f.minLen)                  { msg = (f.label || 'This field') + ' must be at least ' + f.minLen + ' characters.'; }
+        else if (val && f.noDigits && /[^a-zA-ZÀ-ÿ\s'\-]/.test(val))        { msg = (f.label || 'This field') + ' must only contain letters.'; }
         else if (val && f.email   && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)){ msg = 'Enter a valid email address.'; }
         else if (val && f.digits  && !/^\d+$/.test(val))                     { msg = (f.label || 'This field') + ' must contain digits only.'; }
         else if (val && f.exactLen && val.length !== f.exactLen)             { msg = (f.label || 'This field') + ' must be exactly ' + f.exactLen + ' digits.'; }
@@ -296,8 +328,21 @@ function clearFormValidation($form) {
     $form.find('.invalid-feedback').remove();
 }
 
-// Real-time: remove error highlight as user corrects a field
+// Real-time: clear error state as the user corrects a field
 $(document).on('input change', '.form-control.is-invalid, .form-select.is-invalid', function () {
     $(this).removeClass('is-invalid').next('.invalid-feedback').remove();
+});
+
+// Autofill detection — Chrome autofill doesn't fire input/change/blur events.
+// After any modal finishes opening, re-check all inputs that already have a value.
+$(document).on('shown.bs.modal', '.modal', function () {
+    var $modal = $(this);
+    setTimeout(function () {
+        $modal.find('input.form-control').each(function () {
+            if ($(this).val().trim() !== '') {
+                $(this).trigger('change');
+            }
+        });
+    }, 200);
 });
 </script>

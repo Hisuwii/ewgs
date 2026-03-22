@@ -5,7 +5,15 @@
       "Bash(/c/xampp/php/php.exe --version)",
       "Bash(php generate_students.php)",
       "Read(//c/xampp/**)",
-      "Bash(mysql -u root -e \":*)"
+      "Bash(mysql -u root -e \":*)",
+      "Bash(xargs sed:*)",
+      "Bash(mysql -u root -e \"SHOW CREATE TABLE tbl_class\\\\G\" ewgs)",
+      "Bash(mysql -u root --password=\"\" -e \"SHOW CREATE TABLE tbl_class\\\\G\" ewgs)",
+      "Bash(grep -n \"flash-toast\" /c/xampp/htdocs/ewgs/views/user/*.php /c/xampp/htdocs/ewgs/views/templates/user/*.php)",
+      "Bash(grep -rn \"toast-notification\\\\|getFlash\\\\b\" /c/xampp/htdocs/ewgs/views/user/*.php)",
+      "Bash(php -l \"c:/xampp/htdocs/ewgs/controllers/TeacherController.php\")",
+      "Bash(php -l \"c:/xampp/htdocs/ewgs/helpers/datatable.php\")",
+      "Bash(php -r \"echo ini_get\\(''error_log''\\);\")"
     ]
   }
 }

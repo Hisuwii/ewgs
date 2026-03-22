@@ -6,8 +6,8 @@
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <title>Teacher Login | Elementary Web Grading System</title>
-    <link href="/ewgs/public/css/bootstrap.css" rel="stylesheet">
-    <link href="/ewgs/public/css/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="<?= BASE ?>/public/css/bootstrap.css" rel="stylesheet">
+    <link href="<?= BASE ?>/public/css/bootstrap-icons.min.css" rel="stylesheet">
 
     <style>
         body {
@@ -126,8 +126,8 @@
 
     <!-- Header -->
     <header class="page-header">
-        <a href="/ewgs/" style="text-decoration: none; display: flex; align-items: center;">
-            <img src="/ewgs/public/images/logo.png" alt="Logo">
+        <a href="<?= BASE ?>/" style="text-decoration: none; display: flex; align-items: center;">
+            <img src="<?= BASE ?>/public/images/logo.png" alt="Logo">
             <h5>Elementary Web Grading System</h5>
         </a>
     </header>
@@ -140,7 +140,7 @@
 
 
 
-            <form action="/ewgs/user/login" method="post">
+            <form action="<?= BASE ?>/user/login" method="post">
                 <!-- Email -->
                 <div class="mb-3 input-group">
                     <span class="input-group-text"><i class="bi bi-envelope"></i></span>
@@ -196,8 +196,8 @@
     </div>
     <?php endif; ?>
 
-    <script src="/ewgs/public/js/jquery.min.js"></script>
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/jquery.min.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <script>
         $(function () {
             // bfcache fix: force reload so PHP session check runs

@@ -8,7 +8,7 @@ class AdminDashboardController
         header('Pragma: no-cache');
 
         if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-            header('Location: /ewgs/admin');
+            header('Location: ' . BASE . '/admin');
             exit;
         }
 
@@ -41,7 +41,7 @@ class AdminDashboardController
     public function addTeacher()
     {
         if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-            header('Location: /ewgs/admin');
+            header('Location: ' . BASE . '/admin');
             exit;
         }
 
@@ -57,7 +57,7 @@ class AdminDashboardController
             setFlash('error', 'Failed to add teacher.');
         }
 
-        header('Location: /ewgs/admin/AdminDashboard');
+        header('Location: ' . BASE . '/admin/AdminDashboard');
         exit;
     }
 }

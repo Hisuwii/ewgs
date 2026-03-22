@@ -115,8 +115,18 @@
             border-radius: 6px;
             padding: 3px 10px;
         }
-        body.dark-mode #classPickerChart { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
-        body.dark-mode #chartSchoolYear  { background: #1a2e1a; color: #a5d6a7; border-color: #3a5a3a; }
+        body.dark-mode #classPickerChart,
+        body.dark-mode #quarterPickerChart {
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+            border-color: #444;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23e0e0e0' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 16px 12px;
+        }
+        body.dark-mode #chartSchoolYear { background: #1a2e1a; color: #a5d6a7; border-color: #3a5a3a; }
+        body.dark-mode #chartNoData     { color: #888 !important; }
     </style>
 </head>
 <body>
@@ -183,7 +193,7 @@
                         <div class="dash-card-header">
                             <i class="bi bi-lightning-charge"></i> Quick Actions
                         </div>
-                        <a href="/ewgs/user/add-grade" class="quick-action-link">
+                        <a href="<?= BASE ?>/user/add-grade" class="quick-action-link">
                             <div class="qa-icon green"><i class="bi bi-plus-circle-fill"></i></div>
                             <div>
                                 <div class="qa-label">Add Grades</div>
@@ -191,7 +201,7 @@
                             </div>
                             <i class="bi bi-chevron-right qa-arrow"></i>
                         </a>
-                        <a href="/ewgs/user/manage-grades" class="quick-action-link">
+                        <a href="<?= BASE ?>/user/manage-grades" class="quick-action-link">
                             <div class="qa-icon blue"><i class="bi bi-clipboard-data-fill"></i></div>
                             <div>
                                 <div class="qa-label">Manage Grades</div>
@@ -199,7 +209,7 @@
                             </div>
                             <i class="bi bi-chevron-right qa-arrow"></i>
                         </a>
-                        <a href="/ewgs/user/my-classes" class="quick-action-link">
+                        <a href="<?= BASE ?>/user/my-classes" class="quick-action-link">
                             <div class="qa-icon orange"><i class="bi bi-people-fill"></i></div>
                             <div>
                                 <div class="qa-label">My Classes</div>
@@ -207,7 +217,7 @@
                             </div>
                             <i class="bi bi-chevron-right qa-arrow"></i>
                         </a>
-                        <a href="/ewgs/user/reports" class="quick-action-link">
+                        <a href="<?= BASE ?>/user/reports" class="quick-action-link">
                             <div class="qa-icon purple"><i class="bi bi-bar-chart-line-fill"></i></div>
                             <div>
                                 <div class="qa-label">Reports</div>
@@ -222,17 +232,23 @@
                 <div class="col-lg-7">
                     <div class="dash-card">
                         <div class="dash-card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-                            <span><i class="bi bi-bar-chart-fill me-1"></i><span id="chartTitle">All Classes</span></span>
+                            <span><i class="bi bi-bar-chart-fill me-1"></i><span id="chartTitle">Grade Overview</span></span>
                             <div class="d-flex align-items-center gap-2">
                                 <span id="chartSchoolYear" style="display:none;"></span>
+                                <select id="quarterPickerChart" class="form-select form-select-sm" style="width:auto;">
+                                    <option value="1st" selected>Q1</option>
+                                    <option value="2nd">Q2</option>
+                                    <option value="3rd">Q3</option>
+                                    <option value="4th">Q4</option>
+                                </select>
                                 <select id="classPickerChart" class="form-select form-select-sm" style="width:auto;min-width:160px;">
-                                    <option value="">All Classes</option>
-                                    <?php foreach ($classes as $c): ?>
+                                    <?php foreach ($classes as $i => $c): ?>
                                         <option value="<?= $c['class_id'] ?>"
+                                            <?= $i === 0 ? 'selected' : '' ?>
                                             data-sy="<?= htmlspecialchars($c['school_year']) ?>"
                                             data-name="<?= htmlspecialchars($c['class_name'] . ' · Grade ' . $c['grade_level']) ?>">
                                             <?= htmlspecialchars($c['class_name'] . ' – Grade ' . $c['grade_level']) ?>
-                                            <small>(<?= htmlspecialchars($c['school_year']) ?>)</small>
+                                            (<?= htmlspecialchars($c['school_year']) ?>)
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -240,6 +256,8 @@
                         </div>
                         <div id="chartNoData" class="text-center text-muted py-4" style="display:none;">
                             <i class="bi bi-info-circle me-1"></i> No grade data yet for this selection.
+                        </div>
+                        <div id="chartStatusBadge" style="display:none; padding: 4px 16px 0;">
                         </div>
                         <div class="chart-wrapper" style="padding:0 16px 16px;">
                             <canvas id="gradeOverviewChart"></canvas>
@@ -251,7 +269,7 @@
         </div>
     </div>
 
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <script>
     $(function () {
         $('.flash-toast').each(function () {
@@ -267,36 +285,47 @@
             setTimeout(function () { $el.removeClass('stat-updated'); }, 600);
         }
         function refreshStats() {
-            $.getJSON('/ewgs/user/dashboard/stats', function (data) {
+            $.getJSON('<?= BASE ?>/user/dashboard/stats', function (data) {
                 animateCount($('#stat-classes'),  data.classes);
                 animateCount($('#stat-students'), data.students);
                 animateCount($('#stat-subjects'), data.subjects);
             });
         }
-        setInterval(refreshStats, 10000);
+        smartPoll(refreshStats, 15000);
 
         // ── Grade overview chart ──────────────────────────────
         var overviewChart = null;
         function isDark() { return $('body').hasClass('dark-mode'); }
 
         function loadOverviewChart(classId) {
-            var url = '/ewgs/user/reports/dashboard-chart';
-            if (classId) url += '?class_id=' + classId;
+            if (!classId) return;
+            var quarter = $('#quarterPickerChart').val();
+            var url = '<?= BASE ?>/user/reports/dashboard-chart?class_id=' + classId;
+            if (quarter) url += '&quarter=' + encodeURIComponent(quarter);
 
             $.getJSON(url, function (data) {
                 if (!data.length) {
                     $('#chartNoData').show();
                     $('.chart-wrapper').hide();
+                    $('#chartStatusBadge').hide();
                     return;
                 }
                 $('#chartNoData').hide();
                 $('.chart-wrapper').show();
 
-                var isClassView = !!classId;
-                var labels  = data.map(function (d) { return isClassView ? d.subject_name : d.class_name; });
+                var labels  = data.map(function (d) { return d.subject_name; });
                 var passed  = data.map(function (d) { return parseInt(d.passed); });
                 var failed  = data.map(function (d) { return parseInt(d.failed); });
-                var yLabel  = isClassView ? 'Students' : 'Grade Records';
+                var yLabel  = 'Students';
+
+                // Show complete/incomplete status badge
+                var allComplete = data.every(function (d) { return parseInt(d.is_complete) === 1; });
+                var $badge = $('#chartStatusBadge');
+                if (allComplete) {
+                    $badge.html('<span style="background:#28a745;color:#fff;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;"><i class="bi bi-check-circle me-1"></i>Grading Complete — Results are final</span>').show();
+                } else {
+                    $badge.html('<span style="background:#ffc107;color:#000;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;"><i class="bi bi-exclamation-circle me-1"></i>Incomplete — Results are not yet final</span>').show();
+                }
 
                 Chart.defaults.color = isDark() ? '#e0e0e0' : '#374151';
                 if (overviewChart) overviewChart.destroy();
@@ -332,7 +361,7 @@
                             tooltip: {
                                 callbacks: {
                                     label: function (ctx) {
-                                        return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + (isClassView ? ' students' : ' grade records');
+                                        return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + ' students';
                                     }
                                 }
                             }
@@ -348,25 +377,28 @@
 
         // Class picker change
         $('#classPickerChart').on('change', function () {
-            var classId  = $(this).val();
-            var $opt     = $(this).find('option:selected');
-            var name     = classId ? $opt.data('name') : 'All Classes';
-            var sy       = $opt.data('sy') || '';
-            $('#chartTitle').text(name);
+            var classId = $(this).val();
+            var $opt    = $(this).find('option:selected');
+            var sy      = $opt.data('sy') || '';
+            $('#chartTitle').text($opt.data('name') || 'Grade Overview');
             if (sy) {
                 $('#chartSchoolYear').text('S.Y. ' + sy).css('display', 'inline-block');
             } else {
                 $('#chartSchoolYear').hide();
             }
-            loadOverviewChart(classId || null);
+            loadOverviewChart(classId);
         });
 
-        loadOverviewChart(null);
+        $('#quarterPickerChart').on('change', function () {
+            loadOverviewChart($('#classPickerChart').val());
+        });
+
+        // Load first class by default
+        $('#classPickerChart').trigger('change');
 
         // Refresh chart on dark mode toggle
         $('#mode-toggle').on('change', function () {
-            var classId = $('#classPickerChart').val() || null;
-            setTimeout(function () { loadOverviewChart(classId); }, 60);
+            setTimeout(function () { loadOverviewChart($('#classPickerChart').val()); }, 60);
         });
     });
     </script>

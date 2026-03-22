@@ -45,35 +45,43 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($classes)): ?>
-                            <tr><td colspan="6" class="text-muted">No classes assigned to you yet.</td></tr>
-                        <?php else: ?>
-                            <?php foreach ($classes as $i => $c): ?>
-                                <tr>
-                                    <td><?= $i + 1 ?></td>
-                                    <td><?= htmlspecialchars($c['class_name']) ?></td>
-                                    <td>Grade <?= htmlspecialchars($c['grade_level']) ?></td>
-                                    <td><?= htmlspecialchars($c['school_year']) ?></td>
-                                    <td><?= (int) $c['student_count'] ?></td>
-                                    <td>
-                                        <a href="/ewgs/user/grade/add/<?= $c['class_id'] ?>" class="btn btn-sm btn-add-grade">
-                                            <i class="bi bi-plus-circle"></i> Add Grade
-                                        </a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                        <?php foreach ($classes as $i => $c): ?>
+                            <tr data-class-id="<?= (int) $c['class_id'] ?>">
+                                <td><?= $i + 1 ?></td>
+                                <td><?= htmlspecialchars($c['class_name']) ?></td>
+                                <td>Grade <?= htmlspecialchars($c['grade_level']) ?></td>
+                                <td><?= htmlspecialchars($c['school_year']) ?></td>
+                                <td class="student-count"><?= (int) $c['student_count'] ?></td>
+                                <td>
+                                    <a href="<?= BASE ?>/user/grade/add/<?= $c['class_id'] ?>" class="btn btn-sm btn-add-grade">
+                                        <i class="bi bi-plus-circle"></i> Add Grade
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <script src="/ewgs/public/js/bootstrap.bundle.js"></script>
+    <script src="<?= BASE ?>/public/js/bootstrap.bundle.js"></script>
     <?php require_once 'views/templates/user/datatable.php'; ?>
     <script>
         $(document).ready(function() {
-            $('#gradeTable').DataTable();
+            $('#gradeTable').DataTable({
+                language: { emptyTable: 'No classes are assigned to you yet.' }
+            });
+
+            function refreshStats() {
+                $.getJSON('<?= BASE ?>/user/my-classes/stats', function (data) {
+                    $.each(data, function (_, item) {
+                        var $cell = $('#gradeTable tbody tr[data-class-id="' + item.class_id + '"] td.student-count');
+                        if ($cell.length) $cell.text(item.student_count);
+                    });
+                });
+            }
+            smartPoll(refreshStats, 15000);
         });
     </script>
 </body>

@@ -5,7 +5,8 @@ $router->get('/admin/register', 'AdminAuthController@showRegister');
 $router->post('/admin/register', 'AdminAuthController@register');
 
 $router->get('/admin/teacher', 'TeacherController@index');
-$router->get('/admin/teacher/data', 'TeacherController@getData');
+$router->get('/admin/teacher/data',         'TeacherController@getData');
+$router->get('/admin/teacher/check-email',  'TeacherController@checkEmail');
 $router->get('/admin/teacher/logs', 'TeacherController@logs');
 $router->get('/admin/teacher/logs/data', 'TeacherController@getLogsData');
 $router->post('/admin/teacher/add', 'TeacherController@add');
@@ -15,24 +16,38 @@ $router->post('/admin/teacher/reset-password', 'TeacherController@resetPassword'
 $router->post('/admin/teacher/toggle-status',    'TeacherController@toggleStatus');
 
 $router->get('/admin/class', 'ClassController@index');
-$router->get('/admin/class/data', 'ClassController@getData');
+$router->get('/admin/class/data',  'ClassController@getData');
+$router->get('/admin/class/check', 'ClassController@checkDuplicate');
 $router->post('/admin/class/add', 'ClassController@add');
 $router->post('/admin/class/edit',   'ClassController@edit');
 $router->post('/admin/class/delete', 'ClassController@delete');
 
 $router->get('/admin/subject', 'SubjectController@index');
-$router->get('/admin/subject/data', 'SubjectController@getData');
-$router->post('/admin/subject/add', 'SubjectController@add');
-$router->post('/admin/subject/edit',   'SubjectController@edit');
+$router->get('/admin/subject/data',      'SubjectController@getData');
+$router->get('/admin/subject/check',     'SubjectController@checkDuplicate');
+$router->get('/admin/subject/edit-data', 'SubjectController@getEditData');
+$router->post('/admin/subject/add',      'SubjectController@add');
+$router->post('/admin/subject/edit',     'SubjectController@edit');
 $router->post('/admin/subject/delete', 'SubjectController@delete');
 
 $router->get('/admin/student',            'StudentController@index');
 $router->get('/admin/student/data',       'StudentController@getData');
+$router->get('/admin/student/check-lrn',  'StudentController@checkLrn');
 $router->post('/admin/student/add',       'StudentController@add');
 $router->post('/admin/student/edit',      'StudentController@edit');
 $router->post('/admin/student/delete',    'StudentController@delete');
 $router->post('/admin/student/import',    'StudentController@importStudents');
 $router->get('/admin/student/template',   'StudentController@downloadTemplate');
+
+$router->get('/admin/assign/teacher',               'AssignmentController@teacherClass');
+$router->get('/admin/assign/teacher/data',          'AssignmentController@getTeacherClassLinks');
+$router->post('/admin/assign/teacher/link',         'AssignmentController@linkTeacher');
+$router->post('/admin/assign/teacher/unlink',       'AssignmentController@unlinkTeacher');
+
+$router->get('/admin/assign/subject',               'AssignmentController@subjectClass');
+$router->get('/admin/assign/subject/data',          'AssignmentController@getSubjectClassLinks');
+$router->post('/admin/assign/subject/link',         'AssignmentController@linkSubject');
+$router->post('/admin/assign/subject/unlink',       'AssignmentController@unlinkSubject');
 
 $router->get('/admin/assign/student',               'AssignmentController@studentClass');
 $router->get('/admin/assign/student/enrolled',      'AssignmentController@enrolledStudents');
@@ -75,6 +90,7 @@ $router->get('/user/reports',                  'UserReportController@index');
 $router->get('/user/reports/section-data',     'UserReportController@sectionData');
 $router->get('/user/reports/student-data',     'UserReportController@studentData');
 $router->get('/user/reports/dashboard-chart',  'UserReportController@dashboardChart');
+$router->get('/user/reports/print-data',       'UserReportController@printData');
 
 // Home page
 // $router->get('/', 'HomeController@index');

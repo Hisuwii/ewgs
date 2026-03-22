@@ -4,7 +4,7 @@ class StudentController {
 
     private function authCheck() {
         if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-            header('Location: /ewgs/admin');
+            header('Location: ' . BASE . '/admin');
             exit;
         }
     }
@@ -12,7 +12,8 @@ class StudentController {
     private function jsonAuthCheck() {
         if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
             http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
+            header('Content-Type: application/json');
+            echo json_encode(['draw' => (int)($_GET['draw']??1), 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => [], 'error' => 'Unauthorized']);
             exit;
         }
     }
@@ -23,6 +24,7 @@ class StudentController {
     }
 
     private function jsonResponse($success, $message) {
+        while (ob_get_level() > 0) ob_end_clean();
         header('Content-Type: application/json');
         echo json_encode(['success' => $success, 'message' => $message]);
         exit;
@@ -35,21 +37,47 @@ class StudentController {
 
     public function getData() {
         $this->jsonAuthCheck();
-        $students = AdminModel::getAllStudents($_SESSION['user_id'] ?? null);
-        $count = 1;
-        $data = array_map(function ($s) use (&$count) {
-            return [
-                'count'         => $count++,
+        $adminId = $_SESSION['user_id'] ?? null;
+        $conn    = getConnection();
+        datatable_response(
+            $conn,
+            "SELECT student_id, student_fname, student_lname,
+                    student_lrn AS lrn, student_gender AS gender, birth_date
+             FROM tbl_student
+             WHERE admin_id = ?",
+            ['student_fname', 'student_lname', 'student_lrn'],
+            'student_id ASC',
+            'i', [$adminId],
+            fn($s) => [
                 'student_id'    => $s['student_id'],
                 'student_fname' => $s['student_fname'],
                 'student_lname' => $s['student_lname'],
                 'lrn'           => $s['lrn'],
                 'gender'        => $s['gender'],
                 'birth_date'    => $s['birth_date'] ?? null,
-            ];
-        }, $students);
+            ],
+            '',
+            [1 => 'student_fname', 2 => 'student_lname', 3 => 'student_lrn', 4 => 'student_gender', 5 => 'birth_date']
+        );
+    }
+
+    public function checkLrn() {
+        $this->jsonAuthCheck();
+        $lrn       = trim($_GET['lrn']        ?? '');
+        $excludeId = (int) ($_GET['exclude_id'] ?? 0);
+        $conn      = getConnection();
+        if ($excludeId) {
+            $stmt = $conn->prepare("SELECT COUNT(*) FROM tbl_student WHERE student_lrn = ? AND student_id != ?");
+            $stmt->bind_param("si", $lrn, $excludeId);
+        } else {
+            $stmt = $conn->prepare("SELECT COUNT(*) FROM tbl_student WHERE student_lrn = ?");
+            $stmt->bind_param("s", $lrn);
+        }
+        $stmt->execute();
+        $count = (int) $stmt->get_result()->fetch_row()[0];
         header('Content-Type: application/json');
-        echo json_encode(['data' => $data]);
+        echo json_encode(['available' => $count === 0]);
+        exit;
     }
 
     private function isValidLrn($lrn) {
@@ -62,7 +90,7 @@ class StudentController {
         if (!$this->isValidLrn($lrn)) {
             if ($this->isAjax()) $this->jsonResponse(false, 'Invalid LRN. Must be exactly 12 digits.');
             setFlash('error', 'Invalid LRN. LRN must be exactly 12 digits.');
-            header('Location: /ewgs/admin/student'); exit;
+            header('Location: ' . BASE . '/admin/student'); exit;
         }
         $_POST['admin_id'] = $_SESSION['user_id'] ?? null;
         if (AdminModel::addStudent($_POST)) {
@@ -72,7 +100,7 @@ class StudentController {
             if ($this->isAjax()) $this->jsonResponse(false, 'Failed to add student. LRN may already exist.');
             setFlash('error', 'Failed to add student. LRN may already exist.');
         }
-        header('Location: /ewgs/admin/student'); exit;
+        header('Location: ' . BASE . '/admin/student'); exit;
     }
 
     public function edit() {
@@ -81,7 +109,7 @@ class StudentController {
         if (!$this->isValidLrn($lrn)) {
             if ($this->isAjax()) $this->jsonResponse(false, 'Invalid LRN. Must be exactly 12 digits.');
             setFlash('error', 'Invalid LRN. LRN must be exactly 12 digits.');
-            header('Location: /ewgs/admin/student'); exit;
+            header('Location: ' . BASE . '/admin/student'); exit;
         }
         if (AdminModel::updateStudent($_POST)) {
             if ($this->isAjax()) $this->jsonResponse(true, 'Student updated successfully.');
@@ -90,7 +118,7 @@ class StudentController {
             if ($this->isAjax()) $this->jsonResponse(false, 'Failed to update student.');
             setFlash('error', 'Failed to update student.');
         }
-        header('Location: /ewgs/admin/student'); exit;
+        header('Location: ' . BASE . '/admin/student'); exit;
     }
 
     public function delete() {
@@ -101,7 +129,7 @@ class StudentController {
         if ($result === 'fk') {
             if ($this->isAjax()) $this->jsonResponse(false, 'Cannot delete this student. They have grades recorded.');
             setFlash('error', 'Cannot delete this student. They have grades recorded.');
-            header('Location: /ewgs/admin/student'); exit;
+            header('Location: ' . BASE . '/admin/student'); exit;
         }
 
         if ($result) {
@@ -111,7 +139,7 @@ class StudentController {
             if ($this->isAjax()) $this->jsonResponse(false, 'Failed to delete student.');
             setFlash('error', 'Failed to delete student.');
         }
-        header('Location: /ewgs/admin/student'); exit;
+        header('Location: ' . BASE . '/admin/student'); exit;
     }
 
     public function importStudents() {
@@ -120,7 +148,7 @@ class StudentController {
         if (!isset($_FILES['import_file']) || $_FILES['import_file']['error'] !== UPLOAD_ERR_OK) {
             if ($this->isAjax()) $this->jsonResponse(false, 'No file uploaded or an upload error occurred.');
             setFlash('error', 'No file uploaded or an upload error occurred.');
-            header('Location: /ewgs/admin/student');
+            header('Location: ' . BASE . '/admin/student');
             exit;
         }
 
@@ -137,7 +165,7 @@ class StudentController {
             } catch (\Exception $e) {
                 if ($this->isAjax()) $this->jsonResponse(false, 'Could not read the Excel file: ' . $e->getMessage());
                 setFlash('error', 'Could not read the Excel file: ' . $e->getMessage());
-                header('Location: /ewgs/admin/student');
+                header('Location: ' . BASE . '/admin/student');
                 exit;
             }
         } elseif ($ext === 'csv') {
@@ -149,7 +177,7 @@ class StudentController {
         } else {
             if ($this->isAjax()) $this->jsonResponse(false, 'Invalid file type. Please upload a .xlsx or .csv file.');
             setFlash('error', 'Invalid file type. Please upload a .xlsx or .csv file.');
-            header('Location: /ewgs/admin/student');
+            header('Location: ' . BASE . '/admin/student');
             exit;
         }
 
@@ -261,7 +289,7 @@ class StudentController {
 
         if ($this->isAjax()) $this->jsonResponse($imported > 0, "Import complete: {$msg}");
         setFlash($imported > 0 ? 'success' : 'error', "Import complete: {$msg}");
-        header('Location: /ewgs/admin/student');
+        header('Location: ' . BASE . '/admin/student');
         exit;
     }
 

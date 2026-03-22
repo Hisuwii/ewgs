@@ -20,7 +20,7 @@ class UserGradeController
     private function authCheck()
     {
         if (!isset($_SESSION['teacher_logged_in']) || $_SESSION['teacher_logged_in'] !== true) {
-            header('Location: /ewgs/');
+            header('Location: ' . BASE . '/');
             exit;
         }
     }
